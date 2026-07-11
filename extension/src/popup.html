@@ -56,6 +56,7 @@
       .mal { background: var(--accent2); }
       .ghost { background: #3a3a42; }
       .danger { background: var(--err); }
+      .done { background: var(--ok); }
       button:disabled { opacity: 0.5; cursor: default; }
       .wide { width: 100%; }
       .row { display: flex; gap: 6px; margin-top: 8px; align-items: center; }
@@ -156,7 +157,10 @@
           <input id="epNum" class="ep" type="text" />
         </div>
         <div class="warn hidden" id="regressWarn"></div>
-        <button class="primary wide" id="saveBtn" style="margin-top: 10px">Gravar no MyAnimeList</button>
+        <div class="row" style="margin-top: 10px">
+          <button class="primary grow" id="saveBtn">Gravar no MyAnimeList</button>
+          <button class="done" id="completeBtn" title="Marca como concluído e define o fim como hoje">Finalizar</button>
+        </div>
         <div class="btnrow">
           <button class="mal" id="openMal">MAL ↗</button>
           <button class="ghost" id="remapLink">trocar anime</button>

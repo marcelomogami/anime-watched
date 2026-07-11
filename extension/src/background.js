@@ -117,7 +117,13 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
         case 'UPDATE_EPISODES':
           sendResponse({
             ok: true,
-            result: await updateEpisodes(msg.animeId, msg.num, msg.total || 0),
+            result: await updateEpisodes(
+              msg.animeId,
+              msg.num,
+              msg.total || 0,
+              msg.dates || {},
+              msg.completed || false,
+            ),
           });
           break;
 

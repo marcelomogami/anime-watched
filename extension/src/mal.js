@@ -226,6 +226,8 @@ export async function getListStatus(animeId) {
     status: ls?.status || null,
     inList: !!ls,
     numEpisodes: data.num_episodes || 0,
+    startDate: ls?.start_date || '',
+    finishDate: ls?.finish_date || '',
   };
 }
 
@@ -240,13 +242,25 @@ export function parseMalId(input) {
 
 // Atualiza num_watched_episodes de um anime. numEpisodes = episódio dentro da temporada.
 // Marca como "completed" se atingiu o total conhecido, senão "watching".
-export async function updateEpisodes(animeId, numEpisodes, totalEpisodes = 0) {
+// dates: { start_date, finish_date } no formato YYYY-MM-DD (opcionais).
+// completed: força status "completed" mesmo sem atingir o total (ex.: simulcast sem total).
+export async function updateEpisodes(
+  animeId,
+  numEpisodes,
+  totalEpisodes = 0,
+  dates = {},
+  completed = false,
+) {
   const status =
-    totalEpisodes > 0 && numEpisodes >= totalEpisodes ? 'completed' : 'watching';
+    completed || (totalEpisodes > 0 && numEpisodes >= totalEpisodes)
+      ? 'completed'
+      : 'watching';
   const body = new URLSearchParams({
     num_watched_episodes: String(numEpisodes),
     status,
   });
+  if (dates.start_date) body.set('start_date', dates.start_date);
+  if (dates.finish_date) body.set('finish_date', dates.finish_date);
   const res = await authedFetch(
     `${API}/anime/${animeId}/my_list_status`,
     {

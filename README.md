@@ -55,7 +55,7 @@ existe) é digitado por você e fica apenas no `chrome.storage.local` da sua má
 - **Temporada nova:** busque/escolha o anime no MAL (ou cole a URL/ID), ajuste o nº do
   episódio se precisar, e clique em **Gravar**.
 - **Temporada já mapeada:** o popup mostra o alvo no MAL e seu progresso atual; ajuste o nº
-  se quiser e clique em **Gravar**.
+  se quiser e clique em **Gravar**. Para fechar a temporada, use **Finalizar**.
 - **Ver mapeamentos:** lista tudo que já foi mapeado, com opção de abrir no MAL
   (**MAL ↗**), **re-mapear** ou **apagar**.
 - **MAL ↗:** tanto na tela do episódio quanto na de mapeamentos, abre a página do anime no
@@ -69,6 +69,17 @@ existe) é digitado por você e fica apenas no `chrome.storage.local` da sua má
   cour com numeração absoluta) — por isso o número é editável antes de gravar.
 - **`status`:** vira `completed` quando o episódio atinge o total de episódios conhecido
   no MAL; senão fica `watching`.
+- **Data de início automática:** ao gravar, se o progresso do MAL estiver em **0** (e o
+  start date vazio), define o início como **hoje**. A trava é o progresso zerado, não o
+  número do episódio — assim funciona mesmo quando o Crunchyroll usa numeração sequencial
+  diferente do MAL (ex.: `E25` no CR = `S2E1` no MAL).
+- **Data de fim automática:** ao completar a temporada (nº ≥ total do MAL, com finish date
+  vazio), define o fim como **hoje**.
+- **Botão "Finalizar":** marca `completed` + fim = **hoje** explicitamente, útil quando o
+  MAL não conhece o total (simulcast/temporada em andamento). Ajusta o progresso para o
+  total quando conhecido.
+- **Nunca sobrescreve datas:** início e fim só são preenchidos quando estão vazios; uma
+  data já existente no MAL é preservada.
 
 ## Estrutura
 

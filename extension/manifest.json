@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Crunchyroll → MyAnimeList",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Grava rapidamente no MyAnimeList o episódio que você acabou de ver no Crunchyroll.",
   "permissions": ["storage", "identity", "scripting", "activeTab"],
   "host_permissions": [

@@ -47,6 +47,36 @@ function openMal(animeId) {
   chrome.tabs.create({ url: `https://myanimelist.net/anime/${animeId}` });
 }
 
+// Data de hoje no formato YYYY-MM-DD (fuso local).
+function todayStr() {
+  const d = new Date();
+  return (
+    d.getFullYear() +
+    '-' +
+    String(d.getMonth() + 1).padStart(2, '0') +
+    '-' +
+    String(d.getDate()).padStart(2, '0')
+  );
+}
+
+// Renderiza a linha de progresso + datas a partir do currentTarget.
+function renderProgress() {
+  const t = currentTarget;
+  if (!t) return;
+  const totalTxt = t.total ? ` de ${t.total}` : '';
+  const base =
+    t.inList || (t.currentWatched || 0) > 0
+      ? `MAL já tem: ${t.currentWatched || 0}${totalTxt} ep`
+      : `ainda não está na sua lista${t.total ? ' · ' + t.total + ' ep' : ''}`;
+  const dt = [
+    t.startDate ? `início ${t.startDate}` : '',
+    t.finishDate ? `fim ${t.finishDate}` : '',
+  ]
+    .filter(Boolean)
+    .join(' · ');
+  $('targetProgress').textContent = dt ? `${base} · ${dt}` : base;
+}
+
 // --- estado em memória ---
 let currentEpisode = null; // { crSeriesId, seasonNumber, episodeNumber, seriesTitle, mapKey, ... }
 let currentTarget = null; // { id, title, total, picture, currentWatched }
@@ -201,12 +231,13 @@ async function selectTarget(target) {
   const ls = await send({ type: 'GET_LIST_STATUS', animeId: target.id });
   if (ls.ok) {
     currentTarget.currentWatched = ls.listStatus.numWatched;
+    currentTarget.inList = ls.listStatus.inList;
+    currentTarget.status = ls.listStatus.status;
+    currentTarget.startDate = ls.listStatus.startDate || '';
+    currentTarget.finishDate = ls.listStatus.finishDate || '';
     if (!currentTarget.total && ls.listStatus.numEpisodes)
       currentTarget.total = ls.listStatus.numEpisodes;
-    const totalTxt = currentTarget.total ? ` de ${currentTarget.total}` : '';
-    $('targetProgress').textContent = ls.listStatus.inList
-      ? `MAL já tem: ${ls.listStatus.numWatched}${totalTxt} ep (${ls.listStatus.status || '—'})`
-      : `ainda não está na sua lista${totalTxt ? ' · ' + currentTarget.total + ' ep' : ''}`;
+    renderProgress();
     updateRegressWarn();
   } else {
     $('targetProgress').textContent = 'não consegui ler o progresso atual';
@@ -227,27 +258,32 @@ function updateRegressWarn() {
   }
 }
 
-async function onSave() {
-  const num = parseInt($('epNum').value, 10);
-  if (!Number.isFinite(num) || num < 0) {
-    setMsg('Número de episódio inválido.', 'err');
-    return;
+// Datas automáticas (só preenche se estiver vazio; nunca sobrescreve):
+// - início = hoje quando o MAL está em 0 e você grava um nº > 0 (robusto à numeração do CR)
+// - fim = hoje quando completa a temporada (nº >= total) ou ao finalizar explicitamente
+function computeDates(num, completed) {
+  const dates = {};
+  if (!currentTarget.startDate && (currentTarget.currentWatched || 0) === 0 && num >= 1) {
+    dates.start_date = todayStr();
   }
-  const cur = currentTarget.currentWatched;
-  if (!forceWrite && cur != null && num < cur) {
-    // primeira tentativa de reduzir: exige segundo clique
-    forceWrite = true;
-    updateRegressWarn();
-    setMsg('Clique novamente para confirmar a redução.', '');
-    return;
+  const willComplete = completed || (currentTarget.total > 0 && num >= currentTarget.total);
+  if (willComplete && !currentTarget.finishDate) {
+    dates.finish_date = todayStr();
   }
+  return dates;
+}
 
-  setMsg('Gravando…');
+// Grava no MAL (usado por "Gravar" e "Finalizar"). completed força status completed.
+async function writeToMal(num, completed) {
+  const dates = computeDates(num, completed);
+  setMsg(completed ? 'Finalizando…' : 'Gravando…');
   const resp = await send({
     type: 'UPDATE_EPISODES',
     animeId: currentTarget.id,
     num,
     total: currentTarget.total || 0,
+    dates,
+    completed,
   });
   if (!resp.ok) {
     setMsg(resp.error || 'Falha ao gravar.', 'err');
@@ -266,11 +302,53 @@ async function onSave() {
     },
   });
   currentTarget.currentWatched = num;
+  currentTarget.inList = true;
+  currentTarget.status =
+    completed || (currentTarget.total > 0 && num >= currentTarget.total)
+      ? 'completed'
+      : 'watching';
+  if (dates.start_date) currentTarget.startDate = dates.start_date;
+  if (dates.finish_date) currentTarget.finishDate = dates.finish_date;
   forceWrite = false;
   updateRegressWarn();
-  const totalTxt = currentTarget.total ? ` de ${currentTarget.total}` : '';
-  $('targetProgress').textContent = `MAL já tem: ${num}${totalTxt} ep`;
-  setMsg(`✓ ${currentTarget.title} — episódio ${num} gravado.`, 'ok');
+  renderProgress();
+  const extras = [];
+  if (dates.start_date) extras.push('início hoje');
+  if (dates.finish_date) extras.push('fim hoje');
+  if (currentTarget.status === 'completed') extras.push('concluído');
+  const suffix = extras.length ? ' · ' + extras.join(' · ') : '';
+  setMsg(`✓ ${currentTarget.title} — episódio ${num} gravado${suffix}.`, 'ok');
+}
+
+async function onSave() {
+  const num = parseInt($('epNum').value, 10);
+  if (!Number.isFinite(num) || num < 0) {
+    setMsg('Número de episódio inválido.', 'err');
+    return;
+  }
+  const cur = currentTarget.currentWatched;
+  if (!forceWrite && cur != null && num < cur) {
+    // primeira tentativa de reduzir: exige segundo clique
+    forceWrite = true;
+    updateRegressWarn();
+    setMsg('Clique novamente para confirmar a redução.', '');
+    return;
+  }
+  await writeToMal(num, false);
+}
+
+// Finaliza a temporada: marca completed + fim = hoje. Usa o total se conhecido.
+async function onComplete() {
+  let num = parseInt($('epNum').value, 10);
+  if (currentTarget.total) {
+    num = currentTarget.total;
+    $('epNum').value = String(num);
+  }
+  if (!Number.isFinite(num) || num < 0) {
+    setMsg('Número de episódio inválido para finalizar.', 'err');
+    return;
+  }
+  await writeToMal(num, true);
 }
 
 // ---------- GESTÃO DE MAPEAMENTOS ----------
@@ -395,6 +473,7 @@ $('epNum').addEventListener('input', () => {
   updateRegressWarn();
 });
 $('saveBtn').onclick = onSave;
+$('completeBtn').onclick = onComplete;
 $('openMal').onclick = () => openMal(currentTarget?.id);
 $('remapLink').onclick = () => {
   remapOnly = false;

@@ -5,6 +5,20 @@ Todas as mudanças relevantes deste projeto são documentadas aqui.
 O formato segue [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/)
 e o projeto adota [Versionamento Semântico](https://semver.org/lang/pt-BR/).
 
+## [0.1.1] — 2026-07-11
+
+### Adicionado
+
+- **Datas de início e fim no MAL (automáticas):** ao gravar, define `start_date = hoje`
+  quando o progresso do MAL está em 0 (robusto à numeração do Crunchyroll — ancora no
+  watched, não no "episódio == 1") e `finish_date = hoje` ao completar a temporada
+  (nº ≥ total). Só preenche datas vazias, nunca sobrescreve.
+- **Botão "Finalizar":** marca `completed` + `finish_date = hoje` explicitamente, mesmo
+  quando o MAL não conhece o total (simulcast/temporada em andamento). Ajusta o watched
+  para o total quando ele é conhecido.
+- **Progresso com datas:** a linha de progresso mostra início/fim (`início 2026-04-19`) e
+  a mensagem de sucesso informa o que foi definido (`início hoje · fim hoje · concluído`).
+
 ## [0.1.0] — 2026-07-11
 
 Primeira versão funcional. Extensão de Chrome (Manifest V3) que grava no MyAnimeList o
@@ -41,4 +55,5 @@ episódio assistido no Crunchyroll, pelo botão da extensão na barra.
 - Sem detecção automática de fim de episódio, sem score/rewatch, sem publicação na
   Chrome Web Store (uso pessoal, carregado unpacked).
 
+[0.1.1]: https://github.com/marcelomogami/anime-watched/releases/tag/v0.1.1
 [0.1.0]: https://github.com/marcelomogami/anime-watched/releases/tag/v0.1.0
