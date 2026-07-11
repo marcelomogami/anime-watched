@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="pt-br">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Crunchyroll → MyAnimeList</title>
+    <style>
+      :root {
+        --bg: #1b1b1f;
+        --fg: #e8e8ea;
+        --muted: #9a9aa2;
+        --accent: #f47521; /* laranja Crunchyroll */
+        --accent2: #2e51a2; /* azul MAL */
+        --card: #26262b;
+        --field: #16161a;
+        --ok: #3fb950;
+        --err: #f85149;
+        --warn: #d29922;
+      }
+      * { box-sizing: border-box; }
+      body {
+        width: 350px;
+        margin: 0;
+        padding: 12px;
+        font: 13px/1.45 system-ui, sans-serif;
+        background: var(--bg);
+        color: var(--fg);
+      }
+      h1 {
+        font-size: 14px;
+        margin: 0 0 10px;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); flex: 0 0 auto; }
+      .dot.on { background: var(--ok); }
+      .card { background: var(--card); border-radius: 8px; padding: 10px; margin-bottom: 10px; }
+      label { display: block; color: var(--muted); font-size: 11px; margin-bottom: 4px; }
+      input[type="text"] {
+        width: 100%;
+        padding: 6px 8px;
+        border-radius: 6px;
+        border: 1px solid #3a3a42;
+        background: var(--field);
+        color: var(--fg);
+        font-size: 12px;
+      }
+      input.ep { width: 64px; text-align: center; }
+      button, a.btn {
+        border: 0; border-radius: 6px; padding: 7px 10px;
+        font-size: 12px; font-weight: 600; cursor: pointer; color: #fff;
+        text-decoration: none; display: inline-block; text-align: center;
+      }
+      .primary { background: var(--accent); }
+      .mal { background: var(--accent2); }
+      .ghost { background: #3a3a42; }
+      .danger { background: var(--err); }
+      button:disabled { opacity: 0.5; cursor: default; }
+      .wide { width: 100%; }
+      .row { display: flex; gap: 6px; margin-top: 8px; align-items: center; }
+      .row.tight { margin-top: 6px; }
+      .grow { flex: 1; }
+      .muted { color: var(--muted); font-size: 11px; }
+      .mono { font-family: ui-monospace, monospace; font-size: 10px; word-break: break-all;
+              background: var(--field); padding: 6px; border-radius: 6px; color: var(--muted); }
+      .epline { font-weight: 600; font-size: 13px; }
+      .epsub { color: var(--muted); font-size: 11px; }
+      .candidate {
+        display: flex; align-items: center; gap: 8px;
+        padding: 6px; border-radius: 6px; background: var(--field); margin-top: 6px;
+      }
+      .candidate img { width: 34px; height: 48px; object-fit: cover; border-radius: 4px; flex: 0 0 auto; background: #333; }
+      .candidate .meta { min-width: 0; flex: 1; }
+      .candidate .title { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .candidate .sub { color: var(--muted); font-size: 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .candidate button { padding: 5px 8px; white-space: nowrap; }
+      .target { display: flex; gap: 8px; align-items: center; }
+      .target img { width: 40px; height: 56px; object-fit: cover; border-radius: 4px; background: #333; flex: 0 0 auto; }
+      .warn { color: var(--warn); font-size: 11px; margin-top: 6px; }
+      .links { margin-top: 8px; font-size: 11px; }
+      .links a { color: var(--accent); cursor: pointer; text-decoration: none; }
+      .links a:hover { text-decoration: underline; }
+      .btnrow { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
+      .btnrow > button { padding: 5px 9px; font-size: 11px; }
+      .maprow { display: flex; flex-direction: column; gap: 6px; padding: 8px 0; border-top: 1px solid #33333a; }
+      .maprow:first-child { border-top: 0; }
+      .maprow .info { min-width: 0; }
+      .maprow .k { font-family: ui-monospace, monospace; font-size: 10px; color: var(--muted); }
+      .maprow .v { font-weight: 600; }
+      .maprow .actions { display: flex; gap: 6px; }
+      .maprow .actions > * { padding: 4px 9px; font-size: 11px; }
+      #msg { font-size: 11px; margin-top: 8px; min-height: 14px; }
+      #msg.ok { color: var(--ok); }
+      #msg.err { color: var(--err); }
+      .hidden { display: none; }
+      a.ext { color: var(--accent); }
+    </style>
+  </head>
+  <body>
+    <h1><span id="statusDot" class="dot"></span> Crunchyroll → MyAnimeList</h1>
+
+    <!-- [1] SETUP -->
+    <div class="card hidden" id="setupCard">
+      <label
+        >Redirect URI (registre no app do MAL em
+        <a class="ext" href="https://myanimelist.net/apiconfig" target="_blank">apiconfig</a>)</label
+      >
+      <div class="mono" id="redirectUri">—</div>
+      <label style="margin-top: 8px">Client ID do MyAnimeList</label>
+      <input id="clientId" type="text" placeholder="cole aqui o Client ID" />
+      <label style="margin-top: 8px">Client Secret <span class="muted">(apps tipo "web" — deixe vazio se for "other")</span></label>
+      <input id="clientSecret" type="text" placeholder="cole o Client Secret (se houver)" />
+      <div class="row">
+        <button class="ghost grow" id="saveCreds">Salvar credenciais</button>
+        <button class="mal grow" id="loginBtn">Login no MAL</button>
+      </div>
+    </div>
+
+    <!-- [4] Fora de /watch/ -->
+    <div class="card hidden" id="nowatchCard">
+      <div class="muted" id="nowatchMsg">Abra um episódio no Crunchyroll.</div>
+      <div class="links"><a id="nw_showMappings">ver mapeamentos</a> · <a id="nw_setup">configuração</a></div>
+    </div>
+
+    <!-- [2]/[3] Episódio detectado -->
+    <div class="card hidden" id="mainCard">
+      <div class="epline" id="epTitle">—</div>
+      <div class="epsub" id="epMeta">—</div>
+
+      <!-- [3] Escolher anime no MAL (não mapeado) -->
+      <div class="hidden" id="pickArea">
+        <div class="row tight">
+          <input id="searchQuery" class="grow" type="text" placeholder="buscar no MAL…" />
+          <button class="ghost" id="searchBtn">Buscar</button>
+        </div>
+        <div id="candidates"></div>
+        <label style="margin-top: 10px">Não achou? Cole a URL ou ID do anime no MAL</label>
+        <div class="row tight">
+          <input id="malUrl" class="grow" type="text" placeholder="myanimelist.net/anime/12345 ou 12345" />
+          <button class="ghost" id="useUrlBtn">Usar</button>
+        </div>
+      </div>
+
+      <!-- [2] Alvo escolhido/mapeado: confirmar e gravar -->
+      <div class="hidden" id="targetArea">
+        <div class="target" style="margin-top: 8px">
+          <img id="targetImg" alt="" />
+          <div class="grow" style="min-width: 0">
+            <div class="v" id="targetTitle" style="font-weight: 600"></div>
+            <div class="epsub" id="targetProgress"></div>
+          </div>
+        </div>
+        <div class="row">
+          <label style="margin: 0">Gravar episódio nº</label>
+          <input id="epNum" class="ep" type="text" />
+        </div>
+        <div class="warn hidden" id="regressWarn"></div>
+        <button class="primary wide" id="saveBtn" style="margin-top: 10px">Gravar no MyAnimeList</button>
+        <div class="btnrow">
+          <button class="mal" id="openMal">MAL ↗</button>
+          <button class="ghost" id="remapLink">trocar anime</button>
+          <button class="ghost" id="showMappings">ver mapeamentos</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- [5] Gestão de mapeamentos -->
+    <div class="card hidden" id="mappingsCard">
+      <div class="row" style="margin: 0 0 6px; justify-content: space-between">
+        <strong style="font-size: 12px">Mapeamentos salvos</strong>
+        <button class="ghost" id="backFromMappings" style="padding: 4px 8px">Voltar</button>
+      </div>
+      <div id="mappingsList"><div class="muted">Nenhum mapeamento ainda.</div></div>
+    </div>
+
+    <div id="msg"></div>
+
+    <script src="popup.js"></script>
+  </body>
+</html>
