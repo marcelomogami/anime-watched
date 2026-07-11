@@ -31,8 +31,8 @@ episódio assistido no Crunchyroll, pelo botão da extensão na barra.
   a extensão avisa e exige um segundo clique antes de reduzir o progresso.
 - **Atalho para o MAL:** botão **MAL ↗** na tela do episódio e na de mapeamentos abre a
   página do anime no MyAnimeList.
-- **Documentação:** `README.md`, `docs/PLAN.md` (plano) e `docs/cr-extraction.md`
-  (investigação da página do Crunchyroll).
+- **Documentação:** `README.md`, `docs/contexto.md` (contexto e plano) e
+  `docs/cr-extraction.md` (investigação da página do Crunchyroll).
 
 ### Notas
 

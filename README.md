@@ -83,6 +83,7 @@ extension/
     popup.html/js   # a interface (máquina de estados)
   icons/
 docs/
+  contexto.md       # contexto e plano de implementação
   cr-extraction.md  # investigação da página /watch/ do Crunchyroll (fonte da extração)
 ```
 
