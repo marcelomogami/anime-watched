@@ -5,6 +5,34 @@ Todas as mudanças relevantes deste projeto são documentadas aqui.
 O formato segue [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/)
 e o projeto adota [Versionamento Semântico](https://semver.org/lang/pt-BR/).
 
+## [0.2.0] — 2026-07-12
+
+### Adicionado
+
+- **Suporte ao Prime Video:** novo content script (`content-pv.js`) que extrai
+  série/temporada/episódio direto do overlay do player (`.atvwebplayersdk-title-text` /
+  `.atvwebplayersdk-episode-info`) — o Prime Video não navega para uma URL própria de
+  player, então a extração exige o player aberto. Detalhes em `docs/pv-extraction.md`.
+- **Roteamento por site no background:** `background.js` agora detecta o site da aba
+  ativa (Crunchyroll ou Prime Video) e injeta/consulta o content script correspondente.
+- **Mapeamento por temporada no Prime Video:** chave `pv:<detailId>` — cada temporada já
+  tem seu próprio `detail/<ID>` na Amazon, então (diferente do CR) não precisa compor com
+  o número da temporada.
+
+### Alterado
+
+- Nome da extensão passa a ser **"Anime Watched"** (mesmo nome do projeto), no lugar de
+  `Crunchyroll/Prime Video → MyAnimeList`.
+- Mensagens de "nenhum episódio detectado" no popup generalizadas por site
+  (`NOT_SUPPORTED_SITE`, `NOT_A_WATCH_PAGE`, `NO_PLAYER_OPEN`).
+
+### Corrigido
+
+- **Título/subtítulo cortados na lista de candidatos do MAL:** `.candidate .title`/`.sub`
+  usavam `white-space: nowrap` + `text-overflow: ellipsis`, truncando nomes longos (ex.:
+  "Katainaka no Ossan, Kens..."). Trocado por quebra de linha (`overflow-wrap: break-word`)
+  e popup alargado de 350px para 380px.
+
 ## [0.1.1] — 2026-07-11
 
 ### Adicionado
@@ -55,5 +83,6 @@ episódio assistido no Crunchyroll, pelo botão da extensão na barra.
 - Sem detecção automática de fim de episódio, sem score/rewatch, sem publicação na
   Chrome Web Store (uso pessoal, carregado unpacked).
 
+[0.2.0]: https://github.com/marcelomogami/anime-watched/releases/tag/v0.2.0
 [0.1.1]: https://github.com/marcelomogami/anime-watched/releases/tag/v0.1.1
 [0.1.0]: https://github.com/marcelomogami/anime-watched/releases/tag/v0.1.0

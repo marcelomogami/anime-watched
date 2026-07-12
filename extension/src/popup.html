@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Crunchyroll → MyAnimeList</title>
+    <title>Anime Watched</title>
     <style>
       :root {
         --bg: #1b1b1f;
@@ -19,7 +19,7 @@
       }
       * { box-sizing: border-box; }
       body {
-        width: 350px;
+        width: 380px;
         margin: 0;
         padding: 12px;
         font: 13px/1.45 system-ui, sans-serif;
@@ -68,14 +68,14 @@
       .epline { font-weight: 600; font-size: 13px; }
       .epsub { color: var(--muted); font-size: 11px; }
       .candidate {
-        display: flex; align-items: center; gap: 8px;
+        display: flex; align-items: flex-start; gap: 8px;
         padding: 6px; border-radius: 6px; background: var(--field); margin-top: 6px;
       }
       .candidate img { width: 34px; height: 48px; object-fit: cover; border-radius: 4px; flex: 0 0 auto; background: #333; }
       .candidate .meta { min-width: 0; flex: 1; }
-      .candidate .title { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-      .candidate .sub { color: var(--muted); font-size: 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-      .candidate button { padding: 5px 8px; white-space: nowrap; }
+      .candidate .title { font-weight: 600; overflow-wrap: break-word; }
+      .candidate .sub { color: var(--muted); font-size: 10px; overflow-wrap: break-word; }
+      .candidate button { padding: 5px 8px; white-space: nowrap; flex: 0 0 auto; }
       .target { display: flex; gap: 8px; align-items: center; }
       .target img { width: 40px; height: 56px; object-fit: cover; border-radius: 4px; background: #333; flex: 0 0 auto; }
       .warn { color: var(--warn); font-size: 11px; margin-top: 6px; }
@@ -99,7 +99,7 @@
     </style>
   </head>
   <body>
-    <h1><span id="statusDot" class="dot"></span> Crunchyroll → MyAnimeList</h1>
+    <h1><span id="statusDot" class="dot"></span> Anime Watched</h1>
 
     <!-- [1] SETUP -->
     <div class="card hidden" id="setupCard">
@@ -120,7 +120,7 @@
 
     <!-- [4] Fora de /watch/ -->
     <div class="card hidden" id="nowatchCard">
-      <div class="muted" id="nowatchMsg">Abra um episódio no Crunchyroll.</div>
+      <div class="muted" id="nowatchMsg">Abra um episódio no Crunchyroll ou no Prime Video.</div>
       <div class="links"><a id="nw_showMappings">ver mapeamentos</a> · <a id="nw_setup">configuração</a></div>
     </div>
 

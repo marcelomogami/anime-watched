@@ -1,11 +1,12 @@
 {
   "manifest_version": 3,
-  "name": "Crunchyroll → MyAnimeList",
-  "version": "0.1.1",
-  "description": "Grava rapidamente no MyAnimeList o episódio que você acabou de ver no Crunchyroll.",
+  "name": "Anime Watched",
+  "version": "0.2.0",
+  "description": "Grava rapidamente no MyAnimeList o episódio que você acabou de ver no Crunchyroll ou no Prime Video.",
   "permissions": ["storage", "identity", "scripting", "activeTab"],
   "host_permissions": [
     "*://*.crunchyroll.com/*",
+    "*://*.primevideo.com/*",
     "https://api.myanimelist.net/*",
     "https://myanimelist.net/*"
   ],
@@ -15,7 +16,7 @@
   },
   "action": {
     "default_popup": "src/popup.html",
-    "default_title": "Crunchyroll → MyAnimeList",
+    "default_title": "Anime Watched",
     "default_icon": {
       "16": "icons/icon16.png",
       "48": "icons/icon48.png",
@@ -31,6 +32,11 @@
     {
       "matches": ["*://*.crunchyroll.com/*"],
       "js": ["src/content.js"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": ["*://*.primevideo.com/*"],
+      "js": ["src/content-pv.js"],
       "run_at": "document_idle"
     }
   ]

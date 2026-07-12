@@ -76,6 +76,7 @@
     data.mapKey = data.crSeriesId
       ? `${data.crSeriesId}#S${data.seasonNumber}`
       : null;
+    data.displayId = data.crSeriesId || ''; // id curto pra exibir no popup
     data.pageUrl = location.href;
     return data;
   }

@@ -1,23 +1,28 @@
-# Crunchyroll → MyAnimeList
+# Crunchyroll/Prime Video → MyAnimeList
 
 Extensão de Chrome (Manifest V3) que grava, com um clique, o episódio que você acabou de
-ver no **Crunchyroll** na sua lista do **MyAnimeList (MAL)**.
+ver no **Crunchyroll** ou no **Prime Video** na sua lista do **MyAnimeList (MAL)**.
 
-Sem servidor, sem backend: OAuth, chamadas ao MAL e o mapa Crunchyroll→MAL vivem inteiros
+Sem servidor, sem backend: OAuth, chamadas ao MAL e o mapa de mapeamentos vivem inteiros
 dentro da extensão (`chrome.storage`).
 
 ## Como funciona
 
-1. Numa página `/watch/` do Crunchyroll, a extensão lê do JSON-LD da página qual é a
-   série, a temporada e o número do episódio.
+1. **Crunchyroll:** numa página `/watch/`, a extensão lê do JSON-LD da página qual é a
+   série, a temporada e o número do episódio (`docs/cr-extraction.md`).
+   **Prime Video:** com o player aberto (o site não navega para uma URL própria — o player
+   é um overlay sobre `/detail/...`), a extensão lê a série/temporada/episódio direto do
+   DOM do player (`docs/pv-extraction.md`).
 2. Você clica no ícone da extensão → o popup mostra o episódio detectado.
-3. Na **primeira vez** de cada temporada, você casa a série do CR com o anime certo no MAL
-   (busca automática por título, ou colando a URL/ID do MAL). Esse mapeamento fica salvo.
+3. Na **primeira vez** de cada temporada, você casa a série com o anime certo no MAL (busca
+   automática por título, ou colando a URL/ID do MAL). Esse mapeamento fica salvo.
 4. A partir daí, é só clicar em **Gravar** — a extensão faz `PATCH` do
    `num_watched_episodes` no MAL.
 
-O mapeamento é guardado por **temporada** (`crSeriesId#Stemporada`, ex.: `GT00371630#S1`),
-o que resolve o caso comum de uma temporada no CR ser uma entrada separada no MAL.
+O mapeamento é guardado por **temporada**: no Crunchyroll, `crSeriesId#Stemporada` (ex.:
+`GT00371630#S1`); no Prime Video, `pv:<detailId>` (ex.: `pv:0GZCWV7IOJ8M9624JD5A4HA66B`) —
+cada temporada já tem o próprio `detail/<ID>` lá. Em ambos os casos resolve o caso comum de
+uma temporada ser uma entrada separada no MAL.
 
 ## Instalação (unpacked)
 
@@ -51,7 +56,9 @@ existe) é digitado por você e fica apenas no `chrome.storage.local` da sua má
 
 ## Uso
 
-- Abra um episódio no Crunchyroll e clique no ícone da extensão.
+- **Crunchyroll:** abra um episódio (`/watch/...`) e clique no ícone da extensão.
+- **Prime Video:** dê play no episódio (o player precisa estar aberto — a extração lê o
+  overlay do player) e clique no ícone da extensão.
 - **Temporada nova:** busque/escolha o anime no MAL (ou cole a URL/ID), ajuste o nº do
   episódio se precisar, e clique em **Gravar**.
 - **Temporada já mapeada:** o popup mostra o alvo no MAL e seu progresso atual; ajuste o nº
@@ -87,19 +94,21 @@ existe) é digitado por você e fica apenas no `chrome.storage.local` da sua má
 extension/
   manifest.json
   src/
-    background.js   # orquestra: lê o episódio da aba, chama o MAL, guarda o mapa
+    background.js   # orquestra: detecta o site, lê o episódio da aba, chama o MAL, guarda o mapa
     content.js      # roda no Crunchyroll: extrai série/temporada/episódio do JSON-LD
+    content-pv.js   # roda no Prime Video: extrai série/temporada/episódio do overlay do player
     mal.js          # cliente da API do MAL (OAuth PKCE, busca, gravar progresso)
-    store.js        # wrapper de chrome.storage (config, tokens, mapa CR→MAL)
+    store.js        # wrapper de chrome.storage (config, tokens, mapa de mapeamentos)
     popup.html/js   # a interface (máquina de estados)
   icons/
 docs/
   contexto.md       # contexto e plano de implementação
   cr-extraction.md  # investigação da página /watch/ do Crunchyroll (fonte da extração)
+  pv-extraction.md  # investigação do player do Prime Video (fonte da extração)
 ```
 
 ## Escopo atual
 
-Só Crunchyroll (no Jellyfin, o plugin `jellyfin-ani-sync` já cobre). Sem detecção
-automática de fim de episódio, sem score/rewatch, sem publicação na Chrome Web Store —
-uso pessoal, carregado unpacked.
+Crunchyroll e Prime Video (no Jellyfin, o plugin `jellyfin-ani-sync` já cobre). Sem
+detecção automática de fim de episódio, sem score/rewatch, sem publicação na Chrome Web
+Store — uso pessoal, carregado unpacked.

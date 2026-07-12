@@ -78,7 +78,7 @@ function renderProgress() {
 }
 
 // --- estado em memória ---
-let currentEpisode = null; // { crSeriesId, seasonNumber, episodeNumber, seriesTitle, mapKey, ... }
+let currentEpisode = null; // { displayId, seasonNumber, episodeNumber, seriesTitle, mapKey, ... }
 let currentTarget = null; // { id, title, total, picture, currentWatched }
 let forceWrite = false; // confirma gravação que reduz progresso
 let remapOnly = false; // re-mapeando pela tela de gestão (não grava episódio)
@@ -99,14 +99,17 @@ async function showSetup(status) {
 
 // ---------- EPISÓDIO ----------
 
+const NOWATCH_MESSAGES = {
+  NOT_SUPPORTED_SITE: 'Abra um episódio no Crunchyroll ou no Prime Video.',
+  NOT_A_WATCH_PAGE: 'Abra a página de um episódio no Crunchyroll.',
+  NO_PLAYER_OPEN: 'Dê play no episódio no Prime Video (o player precisa estar aberto).',
+};
+
 async function showEpisode() {
   const resp = await send({ type: 'GET_CURRENT_EPISODE' });
   if (!resp.ok) {
-    const msg =
-      resp.error === 'NOT_CRUNCHYROLL'
-        ? 'Abra um episódio no Crunchyroll.'
-        : 'Não consegui ler o episódio nesta página.';
-    $('nowatchMsg').textContent = msg;
+    $('nowatchMsg').textContent =
+      NOWATCH_MESSAGES[resp.error] || 'Não consegui ler o episódio nesta página.';
     showCard('nowatchCard');
     return;
   }
@@ -115,11 +118,11 @@ async function showEpisode() {
   $('epTitle').textContent = currentEpisode.seriesTitle || 'Episódio';
   $('epMeta').textContent =
     `S${currentEpisode.seasonNumber} · ep ${currentEpisode.episodeNumber}` +
-    (currentEpisode.crSeriesId ? ` · ${currentEpisode.crSeriesId}` : '');
+    (currentEpisode.displayId ? ` · ${currentEpisode.displayId}` : '');
   showCard('mainCard');
 
   if (!currentEpisode.mapKey) {
-    // sem crSeriesId (fallback og): não dá pra mapear por temporada
+    // sem id da série (fallback og do CR): não dá pra mapear por temporada
     $('pickArea').classList.add('hidden');
     $('targetArea').classList.add('hidden');
     setMsg('Não identifiquei a série do Crunchyroll. Recarregue a página do episódio.', 'err');

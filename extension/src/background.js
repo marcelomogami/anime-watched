@@ -13,11 +13,18 @@ import {
   getRedirectUri,
 } from './mal.js';
 
-// Lê o episódio atual da aba ativa, injetando o content script se preciso.
+// Sites suportados: cada um tem seu content script de extração.
+const SITES = [
+  { test: /crunchyroll\.com/, file: 'src/content.js' },
+  { test: /primevideo\.com/, file: 'src/content-pv.js' },
+];
+
+// Lê o episódio atual da aba ativa, injetando o content script certo se preciso.
 async function getEpisodeFromActiveTab() {
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-  if (!tab || !/crunchyroll\.com/.test(tab.url || '')) {
-    return { ok: false, error: 'NOT_CRUNCHYROLL' };
+  const site = SITES.find((s) => s.test.test(tab?.url || ''));
+  if (!tab || !site) {
+    return { ok: false, error: 'NOT_SUPPORTED_SITE' };
   }
   const send = () =>
     new Promise((resolve, reject) => {
@@ -35,7 +42,7 @@ async function getEpisodeFromActiveTab() {
     try {
       await chrome.scripting.executeScript({
         target: { tabId: tab.id },
-        files: ['src/content.js'],
+        files: [site.file],
       });
       resp = await send();
     } catch (e) {
