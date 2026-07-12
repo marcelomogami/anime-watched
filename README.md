@@ -6,6 +6,12 @@ ver no **Crunchyroll** ou no **Prime Video** na sua lista do **MyAnimeList (MAL)
 Sem servidor, sem backend: OAuth, chamadas ao MAL e o mapa de mapeamentos vivem inteiros
 dentro da extensão (`chrome.storage`).
 
+## Screenshots
+
+| Episódio detectado → gravar | Buscar/escolher no MAL | Gestão de mapeamentos |
+|---|---|---|
+| ![Popup com episódio detectado e anime já mapeado](docs/screenshots/popup-main.png) | ![Popup com resultados de busca no MAL](docs/screenshots/popup-search.png) | ![Tela de gestão de mapeamentos salvos](docs/screenshots/popup-mappings.png) |
+
 ## Como funciona
 
 1. **Crunchyroll:** numa página `/watch/`, a extensão lê do JSON-LD da página qual é a
