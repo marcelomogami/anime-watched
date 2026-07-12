@@ -11,6 +11,7 @@
         --muted: #9a9aa2;
         --accent: #f47521; /* laranja Crunchyroll */
         --accent2: #2e51a2; /* azul MAL */
+        --pv: #1399ff; /* azul Prime Video */
         --card: #26262b;
         --field: #16161a;
         --ok: #3fb950;
@@ -91,6 +92,12 @@
       .maprow .v { font-weight: 600; }
       .maprow .actions { display: flex; gap: 6px; }
       .maprow .actions > * { padding: 4px 9px; font-size: 11px; }
+      .src-badge {
+        display: inline-block; font-size: 9px; font-weight: 700; padding: 1px 5px;
+        border-radius: 4px; margin-right: 6px; vertical-align: middle; color: #fff;
+      }
+      .src-badge.cr { background: var(--accent); }
+      .src-badge.pv { background: var(--pv); }
       #msg { font-size: 11px; margin-top: 8px; min-height: 14px; }
       #msg.ok { color: var(--ok); }
       #msg.err { color: var(--err); }

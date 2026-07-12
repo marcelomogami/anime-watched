@@ -207,6 +207,7 @@ async function selectTarget(target) {
         malTitle: target.title,
         malNumEpisodes: target.total || 0,
         crSeriesTitle: currentEpisode.seriesTitle,
+        site: currentEpisode.site,
         savedAt: Date.now(),
       },
     });
@@ -301,6 +302,7 @@ async function writeToMal(num, completed) {
       malTitle: currentTarget.title,
       malNumEpisodes: currentTarget.total || 0,
       crSeriesTitle: currentEpisode.seriesTitle,
+      site: currentEpisode.site,
       savedAt: Date.now(),
     },
   });
@@ -356,6 +358,13 @@ async function onComplete() {
 
 // ---------- GESTÃO DE MAPEAMENTOS ----------
 
+// Mapeamentos salvos antes do suporte a múltiplos sites não têm `site` gravado —
+// nesse caso só existia Crunchyroll, então cai no fallback pelo formato da chave.
+function siteOf(key, val) {
+  return val?.site || (key.startsWith('pv:') ? 'pv' : 'cr');
+}
+const SITE_LABEL = { cr: 'CR', pv: 'PV' };
+
 async function openMappings() {
   const resp = await send({ type: 'GET_ALL_MAPPINGS' });
   const list = $('mappingsList');
@@ -365,11 +374,12 @@ async function openMappings() {
     list.innerHTML = '<div class="muted">Nenhum mapeamento ainda.</div>';
   }
   for (const [key, val] of entries) {
+    const site = siteOf(key, val);
     const row = document.createElement('div');
     row.className = 'maprow';
     row.innerHTML = `
       <div class="info">
-        <div class="v">${escapeHtml(val.malTitle || '?')}</div>
+        <div class="v"><span class="src-badge ${site}">${SITE_LABEL[site]}</span>${escapeHtml(val.malTitle || '?')}</div>
         <div class="k">${escapeHtml(key)}${val.malNumEpisodes ? ' · ' + val.malNumEpisodes + ' ep' : ''}</div>
       </div>`;
     const actions = document.createElement('div');
@@ -400,7 +410,11 @@ async function openMappings() {
 
 // Re-mapear pela tela de gestão: reusa o pick, mas só troca o alvo (não grava episódio).
 function startRemap(mapKey, val) {
-  currentEpisode = { mapKey, seriesTitle: val.crSeriesTitle || val.malTitle || '' };
+  currentEpisode = {
+    mapKey,
+    seriesTitle: val.crSeriesTitle || val.malTitle || '',
+    site: siteOf(mapKey, val),
+  };
   remapOnly = true;
   $('epTitle').textContent = 'Re-mapear';
   $('epMeta').textContent = mapKey;

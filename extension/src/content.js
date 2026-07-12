@@ -77,6 +77,7 @@
       ? `${data.crSeriesId}#S${data.seasonNumber}`
       : null;
     data.displayId = data.crSeriesId || ''; // id curto pra exibir no popup
+    data.site = 'cr';
     data.pageUrl = location.href;
     return data;
   }

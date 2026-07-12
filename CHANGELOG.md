@@ -18,11 +18,17 @@ e o projeto adota [Versionamento Semântico](https://semver.org/lang/pt-BR/).
 - **Mapeamento por temporada no Prime Video:** chave `pv:<detailId>` — cada temporada já
   tem seu próprio `detail/<ID>` na Amazon, então (diferente do CR) não precisa compor com
   o número da temporada.
+- **Badge de origem (CR/PV) na lista de mapeamentos:** cada mapeamento salvo agora grava um
+  campo `site` (`cr`/`pv`), exibido como selo colorido antes do título. Mapeamentos salvos
+  antes dessa mudança não têm o campo — cai no fallback de inferir pelo formato da chave
+  (só existia Crunchyroll antes do suporte a múltiplos sites, então a ausência do prefixo
+  `pv:` já identifica CR com segurança).
+- Screenshots do popup (`docs/screenshots/`) referenciadas no README.
 
 ### Alterado
 
 - Nome da extensão passa a ser **"Anime Watched"** (mesmo nome do projeto), no lugar de
-  `Crunchyroll/Prime Video → MyAnimeList`.
+  `Crunchyroll/Prime Video → MyAnimeList` — inclui o título (H1) do README.
 - Mensagens de "nenhum episódio detectado" no popup generalizadas por site
   (`NOT_SUPPORTED_SITE`, `NOT_A_WATCH_PAGE`, `NO_PLAYER_OPEN`).
 

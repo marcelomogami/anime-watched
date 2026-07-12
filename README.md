@@ -1,4 +1,4 @@
-# Crunchyroll/Prime Video → MyAnimeList
+# Anime Watched
 
 Extensão de Chrome (Manifest V3) que grava, com um clique, o episódio que você acabou de
 ver no **Crunchyroll** ou no **Prime Video** na sua lista do **MyAnimeList (MAL)**.

@@ -32,6 +32,7 @@
       // distintos), então não precisa compor com seasonNumber como no CR.
       mapKey: pvDetailId ? `pv:${pvDetailId}` : null,
       displayId: pvDetailId || '', // id curto pra exibir no popup
+      site: 'pv',
       pageUrl: location.href,
     };
   }
