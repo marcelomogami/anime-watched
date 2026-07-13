@@ -136,6 +136,31 @@ pra copiar, e reverse-engineer esse token foge do padrão do projeto de "ler
 só o que está exposto no DOM/metadados públicos" (mesma decisão já tomada em
 `docs/pv-extraction.md` sobre não interceptar `fetch`/`XHR`).
 
+### Alternativa manual pra temporadas 2+ com rótulo não reconhecido
+
+Se o fallback (assume temporada 1) errar — série com 2+ temporadas cujo
+rótulo no dropdown não bate com nenhum dos padrões conhecidos —, dá pra
+mapear certo sem depender do dropdown: **abrir o episódio 1 da temporada
+certa (clicar na miniatura na própria lista de episódios da página da série)
+sem apertar play**, e usar "Plan to watch" a partir de lá. A extração
+`/watch/` (`fromJsonLd()`) já lê `seasonNumber` de forma 100% confiável, sem
+ambiguidade nenhuma — o único motivo de existir a extração alternativa pela
+página da série é evitar abrir `/watch/`.
+
+Investigado ao vivo (2026-07-13): abrir a página `/watch/` **sem apertar
+play** não gera nenhuma requisição de rede parecida com rastreamento de
+"assistido"/"histórico"/"continuar assistindo" — só busca de metadados
+(episódio, série, avaliações, recomendações, episódio anterior). Ou seja,
+parece seguro contra o problema original (CR registrar como "aberto"). Não
+consegui confirmar o que acontece **depois** que o play de fato começa (a
+tentativa de play caiu num paywall de "assine premium" na sessão anônima de
+teste, sem chegar a reproduzir o vídeo) — mas a leitura mais provável é que o
+rastreamento em si dispare no início da reprodução, não no carregamento da
+página. Decisão registrada: manter o fallback automático (assume S1) como
+está, sem automatizar a abertura de aba em background pra isso — é mais
+prático simplesmente abrir manualmente o episódio certo sem dar play, nos
+casos raros em que o fallback erraria.
+
 ### Heurística final (com fallback pra temporada 1)
 
 ```

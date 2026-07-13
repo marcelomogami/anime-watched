@@ -202,6 +202,16 @@ casos raros, se fizer sentido).
 Isso fecha as perguntas em aberto anteriores sobre a origem "página do anime" —
 não há mais bloqueio de investigação pra essa parte do plano.
 
+**Nota (2026-07-13):** cogitei automatizar o caso em que o fallback erra
+(abrir o episódio 1 da temporada certa numa aba em background, ler o
+JSON-LD, fechar a aba) — mas decidi não implementar. Custo (novo alvo de
+extração pra achar o link do episódio certo na lista de episódios, gestão de
+ciclo de vida da aba, tratamento de erro) não compensa o benefício (só evita
+o caso raro de série multi-temporada sem rótulo reconhecido *e* querendo
+mapear a temporada 2+ especificamente). Decisão: manter o fallback simples
+(assume S1) e, nesse caso raro, abrir manualmente o episódio sem dar play
+(ver `docs/cr-extraction.md`, seção "Alternativa manual pra temporadas 2+").
+
 ## Bug pós-implementação (2026-07-13): nem toda série usa `S{N}:`
 
 Em uso real, o anime "Clevatess" (2 temporadas, `"Clevatess"` /
