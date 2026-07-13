@@ -10,6 +10,7 @@ import {
   getAnime,
   getListStatus,
   updateEpisodes,
+  setPlanToWatch,
   getRedirectUri,
 } from './mal.js';
 
@@ -132,6 +133,10 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
               msg.completed || false,
             ),
           });
+          break;
+
+        case 'PLAN_TO_WATCH':
+          sendResponse({ ok: true, result: await setPlanToWatch(msg.animeId) });
           break;
 
         default:

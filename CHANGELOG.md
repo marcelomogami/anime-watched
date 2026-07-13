@@ -5,6 +5,32 @@ All notable changes to this project are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 and the project adopts [Semantic Versioning](https://semver.org/).
 
+## [0.4.0] — 2026-07-13
+
+### Added
+
+- **"Plan to watch" button.** Saved mappings no longer require recording episode
+  progress first — you can now bookmark an anime you haven't started yet, so it
+  shows up in the mappings list (with its `CR ↗` / `PV ↗` shortcut) right away.
+  If the anime isn't in any MyAnimeList list yet, this also sets its status to
+  `plan_to_watch` there (0 episodes watched); if it's already in a list
+  (watching, completed, etc.), only the local mapping is saved — existing
+  progress is never overwritten.
+- **Mapping from the anime's own page, no episode required.** Crunchyroll
+  (`/series/{id}/...`) and Prime Video (`/detail/{id}`) pages can now be mapped
+  directly, without opening an episode or starting the player — avoids the
+  platform recording the episode as "opened" for something you haven't
+  actually watched yet. Season detection on Crunchyroll reads the page's own
+  season selector; Prime Video's `/detail/{id}` is already season-specific.
+  Opening an episode or the player still works exactly as before.
+
+### Changed
+
+- Error messages for "couldn't identify what to map" now cover both entry
+  points (episode/player and anime page) instead of assuming the episode page.
+
+See `docs/contexto-mapeamento-sem-gravar.md` for the full design notes.
+
 ## [0.3.6] — 2026-07-13
 
 ### Fixed

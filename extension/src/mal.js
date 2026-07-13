@@ -275,3 +275,22 @@ export async function updateEpisodes(
   }
   return res.json();
 }
+
+// Marca como "plan to watch", sem episódios assistidos e sem datas — usado
+// quando o usuário só quer guardar o anime pra assistir depois, sem progresso.
+export async function setPlanToWatch(animeId) {
+  const body = new URLSearchParams({
+    num_watched_episodes: '0',
+    status: 'plan_to_watch',
+  });
+  const res = await authedFetch(`${API}/anime/${animeId}/my_list_status`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: body.toString(),
+  });
+  if (!res.ok) {
+    const t = await res.text();
+    throw new Error(`Falha ao gravar no MAL (${res.status}): ${t}`);
+  }
+  return res.json();
+}

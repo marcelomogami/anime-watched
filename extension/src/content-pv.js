@@ -1,7 +1,8 @@
 // content-pv.js — roda em *.primevideo.com
-// Extrai dados do episódio atual do overlay do player (aberto sobre /detail/...).
-// Fonte: elementos .atvwebplayersdk-* injetados pelo próprio player da Amazon
-// (ver docs/pv-extraction.md). Extração é sob demanda: só funciona com o player aberto.
+// Extrai dados do episódio atual do overlay do player (aberto sobre /detail/...), ou
+// da própria página /detail/... sem o player aberto (ver docs/pv-extraction.md).
+// Fonte com player: elementos .atvwebplayersdk-* injetados pelo SDK da Amazon.
+// Fonte sem player: <meta name="title"> da página de detalhe.
 
 (function () {
   function parseDetailId(url) {
@@ -10,7 +11,7 @@
   }
 
   // Lê temporada/episódio/títulos do overlay do player, se estiver aberto.
-  function extractNow() {
+  function fromPlayerOverlay() {
     const episodeEl = document.querySelector('.atvwebplayersdk-episode-info');
     if (!episodeEl) return null; // player fechado / nada tocando
 
@@ -35,6 +36,45 @@
       site: 'pv',
       pageUrl: location.href,
     };
+  }
+
+  // Lê série+temporada só da página de detalhe, sem precisar abrir o player — usado
+  // pra mapear um anime sem a Amazon registrar que ele foi "começado". O `pvDetailId`
+  // já é por-temporada, então a temporada extraída aqui é só pra exibição/checagem,
+  // não é necessária pra montar a chave de mapeamento.
+  function fromDetailPage() {
+    const pvDetailId = parseDetailId(location.href);
+    if (!pvDetailId) return null;
+
+    const meta = document.querySelector('meta[name="title"]')?.content || '';
+    // Formato confirmado (pt-BR): "Assista à temporada {N} de {Título} – Prime Video".
+    // Outros locales da própria Amazon podem frasear diferente — regex tolerante a
+    // pt/en, com fallback pro <title> da página se não bater (ver docs/pv-extraction.md).
+    const m = meta.match(
+      /(?:temporada|season)\s+(\d+)\s+(?:de|of)\s+(.+?)\s*[–-]\s*Prime Video\s*$/i,
+    );
+    const seasonNumber = m ? Number(m[1]) : null;
+    const seriesTitle = m
+      ? m[2].trim()
+      : document.title.replace(/^Prime Video:\s*/i, '').trim();
+    if (!seriesTitle) return null; // página ainda não renderizou
+
+    return {
+      source: 'pv-detail-page',
+      pvDetailId,
+      seasonNumber,
+      episodeNumber: null,
+      episodeTitle: '',
+      seriesTitle,
+      mapKey: `pv:${pvDetailId}`,
+      displayId: pvDetailId,
+      site: 'pv',
+      pageUrl: location.href,
+    };
+  }
+
+  function extractNow() {
+    return fromPlayerOverlay() || fromDetailPage();
   }
 
   // Espera o player montar o overlay (poll curto) — mesmo padrão do content.js do CR.

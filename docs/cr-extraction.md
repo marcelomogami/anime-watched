@@ -78,3 +78,61 @@ JSON-LD faltar.
 - **Bloqueio de segurança do executor:** dumps amplos de `window`/scripts são barrados
   pelo filtro (suspeita de cookie/token). No content script isso não se aplica — mas
   confirma que devemos ler apenas os campos do JSON-LD, sem varrer `window`.
+
+## Extração na página da série (`/series/{crSeriesId}/...`, sem abrir episódio)
+
+Investigado ao vivo em 2026-07-13 (Playwright), pra viabilizar mapear um anime sem
+abrir `/watch/` (que a plataforma registra como "aberto"). Testado em:
+
+- `https://www.crunchyroll.com/series/GT00371630/daemons-of-the-shadow-realm`
+  (1 temporada só)
+- `https://www.crunchyroll.com/series/GR751KNZY/attack-on-titan` (4 temporadas +
+  OADs/filme)
+
+### `crSeriesId` e título
+
+Vêm direto da URL (`parseSeriesId`, já implementado) e do JSON-LD `TVSeries` da
+própria página (`name`, com prefixo `"Watch "` a remover — diferente do prefixo
+romaji do JSON-LD `TVEpisode`). **Esse JSON-LD não traz `seasonNumber` nem
+`TVSeason`** — season não vem daqui.
+
+### `seasonNumber`: dropdown de temporada no DOM
+
+A página tem um seletor de temporada (visível só quando a série tem **mais de
+uma temporada**). Elemento estável (classe sem hash de CSS module):
+
+```html
+<div class="season-info">
+  <span class="...">S1: Attack on Titan</span>
+  ...
+</div>
+```
+
+Texto no formato `S{N}: {Título}` — regex `/^S(\d+):/`. Confirmado que o texto
+**reflete a temporada atualmente selecionada no dropdown**, atualizando ao vivo
+quando o usuário troca de temporada pela UI (testado: trocar pra "S2: Attack on
+Titan Season 2" atualiza `.season-info` na hora). **A URL não muda** ao trocar de
+temporada — é só estado client-side. Isso implica: extrair o `seasonNumber`
+exige ler o DOM **no momento da extração**, não dá pra inferir só pela URL, e o
+usuário precisa estar com a temporada certa selecionada no dropdown antes de
+mapear.
+
+Casos observados no dropdown de "Attack on Titan": a maioria segue `S{N}: ...`,
+mas conteúdo bônus (`"Attack on Titan OADs"`, `"Attack on Titan: THE LAST
+ATTACK"`) não tem prefixo de temporada — não dá pra extrair `seasonNumber`
+confiável nesses itens.
+
+### Fallback: série com 1 temporada só
+
+Quando a série só tem uma temporada, o dropdown **nem existe** —
+`.season-info` retorna `null` (confirmado em "Daemons of the Shadow Realm").
+Nesse caso é seguro assumir `seasonNumber = 1` sem ambiguidade.
+
+### Resumo da lógica de extração proposta
+
+```
+seasonEl = document.querySelector('.season-info')
+if (!seasonEl) → seasonNumber = 1                       // série de temporada única
+else if (match = seasonEl.textContent.match(/^S(\d+):/)) → seasonNumber = match[1]
+else → sem season number confiável (conteúdo bônus/filme) → não dá pra mapear por aqui
+```

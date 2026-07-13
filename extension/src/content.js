@@ -1,6 +1,7 @@
 // content.js — roda em *.crunchyroll.com
-// Extrai dados do episódio atual da página /watch/ e responde ao background.
-// Fonte primária: JSON-LD TVEpisode (ver docs/cr-extraction.md). Fallback: og:title.
+// Extrai dados do episódio atual da página /watch/, ou da série+temporada na página
+// /series/{id}/... (sem episódio aberto — ver docs/cr-extraction.md). Responde ao
+// background. Fonte primária pro /watch/: JSON-LD TVEpisode. Fallback: og:title.
 
 (function () {
   function parseSeriesId(url) {
@@ -68,14 +69,54 @@
     };
   }
 
+  // Lê a temporada selecionada no dropdown da página da série (ver docs/cr-extraction.md,
+  // seção "Extração na página da série"). Retorna 1 se o dropdown nem existe (série de
+  // temporada única) ou null se existe mas não tem prefixo "S{n}:" (conteúdo bônus/filme).
+  function seasonFromSeriesPage() {
+    const el = document.querySelector('.season-info');
+    if (!el) return 1;
+    const m = (el.textContent || '').trim().match(/^S(\d+):/);
+    return m ? Number(m[1]) : null;
+  }
+
+  // Extrai série+temporada da página /series/{id}/..., sem depender de um episódio
+  // aberto — usado pra mapear um anime sem a CR registrar que ele foi "aberto".
+  function fromSeriesPage() {
+    const crSeriesId = parseSeriesId(location.href);
+    if (!crSeriesId) return null;
+    const og = document.querySelector('meta[property="og:title"]');
+    // og:title só aparece depois que o SPA renderiza (mesmo timing do JSON-LD nas
+    // páginas /watch/, ver docs/cr-extraction.md). Não decide a temporada (nem
+    // assume "sem dropdown = temporada única") antes disso: até lá, `.season-info`
+    // pode só estar ausente porque a página ainda não montou, não porque a série
+    // tem uma temporada só — resolver cedo demais gravaria a temporada errada.
+    if (!og?.content) return null;
+    const seriesTitle = og.content.replace(/^Watch\s+/i, '').trim();
+    return {
+      source: 'series-page',
+      crSeriesId,
+      seasonNumber: seasonFromSeriesPage(),
+      episodeNumber: null,
+      seriesTitle,
+      episodeTitle: '',
+    };
+  }
+
   function extractNow() {
-    if (!/\/watch\//.test(location.pathname)) return null;
-    const data = fromJsonLd() || fromOgTitle();
+    let data = null;
+    if (/\/watch\//.test(location.pathname)) {
+      data = fromJsonLd() || fromOgTitle();
+    } else if (/\/series\//.test(location.pathname)) {
+      data = fromSeriesPage();
+    }
     if (!data) return null;
-    data.episodeId = parseEpisodeId(location.href);
-    data.mapKey = data.crSeriesId
-      ? `${data.crSeriesId}#S${data.seasonNumber}`
+    data.episodeId = /\/watch\//.test(location.pathname)
+      ? parseEpisodeId(location.href)
       : null;
+    data.mapKey =
+      data.crSeriesId && data.seasonNumber
+        ? `${data.crSeriesId}#S${data.seasonNumber}`
+        : null;
     data.displayId = data.crSeriesId || ''; // id curto pra exibir no popup
     data.site = 'cr';
     data.pageUrl = location.href;

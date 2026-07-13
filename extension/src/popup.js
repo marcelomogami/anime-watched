@@ -151,11 +151,17 @@ async function showEpisode() {
   currentEpisode = resp.data;
   remapOnly = false;
   $('epTitle').textContent = currentEpisode.seriesTitle || tr('episodeFallback');
+  const meta =
+    currentEpisode.episodeNumber != null
+      ? tr('epMetaFormat', {
+          season: currentEpisode.seasonNumber,
+          episode: currentEpisode.episodeNumber,
+        })
+      : currentEpisode.seasonNumber != null
+        ? tr('seasonOnlyFormat', { season: currentEpisode.seasonNumber })
+        : tr('noEpisodeFormat');
   $('epMeta').textContent =
-    tr('epMetaFormat', {
-      season: currentEpisode.seasonNumber,
-      episode: currentEpisode.episodeNumber,
-    }) + (currentEpisode.displayId ? ` · ${currentEpisode.displayId}` : '');
+    meta + (currentEpisode.displayId ? ` · ${currentEpisode.displayId}` : '');
   showCard('mainCard');
 
   if (!currentEpisode.mapKey) {
@@ -229,6 +235,22 @@ function renderCandidates(list) {
   }
 }
 
+// Grava/atualiza o vínculo local CR/PV↔MAL pro episódio/série atual.
+function saveMapping(target) {
+  return send({
+    type: 'SAVE_MAPPING',
+    mapKey: currentEpisode.mapKey,
+    value: {
+      malAnimeId: target.id,
+      malTitle: target.title,
+      malNumEpisodes: target.total || 0,
+      crSeriesTitle: currentEpisode.seriesTitle,
+      site: currentEpisode.site,
+      savedAt: Date.now(),
+    },
+  });
+}
+
 // Alvo escolhido (via busca, URL, ou mapeamento existente).
 async function selectTarget(target) {
   currentTarget = { ...target, currentWatched: null };
@@ -236,18 +258,7 @@ async function selectTarget(target) {
 
   if (remapOnly) {
     // apenas troca o mapeamento, sem gravar episódio
-    await send({
-      type: 'SAVE_MAPPING',
-      mapKey: currentEpisode.mapKey,
-      value: {
-        malAnimeId: target.id,
-        malTitle: target.title,
-        malNumEpisodes: target.total || 0,
-        crSeriesTitle: currentEpisode.seriesTitle,
-        site: currentEpisode.site,
-        savedAt: Date.now(),
-      },
-    });
+    await saveMapping(target);
     setMsg(tr('mappedTo', { title: target.title }), 'ok');
     openMappings();
     return;
@@ -331,18 +342,7 @@ async function writeToMal(num, completed) {
     return;
   }
   // upsert do mapeamento (garante que fica salvo)
-  await send({
-    type: 'SAVE_MAPPING',
-    mapKey: currentEpisode.mapKey,
-    value: {
-      malAnimeId: currentTarget.id,
-      malTitle: currentTarget.title,
-      malNumEpisodes: currentTarget.total || 0,
-      crSeriesTitle: currentEpisode.seriesTitle,
-      site: currentEpisode.site,
-      savedAt: Date.now(),
-    },
-  });
+  await saveMapping(currentTarget);
   currentTarget.currentWatched = num;
   currentTarget.inList = true;
   currentTarget.status =
@@ -391,6 +391,23 @@ async function onComplete() {
     return;
   }
   await writeToMal(num, true);
+}
+
+// "Plan to watch": grava o vínculo local sem gravar episódio. Se o anime ainda
+// não está em nenhuma lista do MAL, também marca status "plan_to_watch" lá
+// (0 episódios) — se já está (watching, completed, etc.), não mexe no status.
+async function onPlanToWatch() {
+  if (!currentTarget.inList) {
+    setMsg(tr('savingMsg'));
+    const resp = await send({ type: 'PLAN_TO_WATCH', animeId: currentTarget.id });
+    if (!resp.ok) {
+      setMsg(resp.error || tr('errFailedToSave'), 'err');
+      return;
+    }
+  }
+  await saveMapping(currentTarget);
+  setMsg(tr('mappedTo', { title: currentTarget.title }), 'ok');
+  openMappings();
 }
 
 // ---------- GESTÃO DE MAPEAMENTOS ----------
@@ -552,6 +569,7 @@ $('epNum').addEventListener('input', () => {
 });
 $('saveBtn').onclick = onSave;
 $('completeBtn').onclick = onComplete;
+$('planToWatchBtn').onclick = onPlanToWatch;
 $('openMal').onclick = () => openMal(currentTarget?.id);
 $('remapLink').onclick = () => {
   remapOnly = false;

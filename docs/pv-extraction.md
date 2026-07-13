@@ -93,3 +93,37 @@ tudo — mas fica registrado como fallback/cross-check caso o DOM mude:
 - **Título de teste T2 só tinha 1 episódio disponível** no momento do teste (lançamento
   contínuo, "7 de jul. de 2026") — suficiente para confirmar o padrão, mas não testamos
   ainda a transição entre episódios consecutivos dentro do mesmo overlay (autoplay).
+
+## Extração na página de detalhe (`/detail/{id}`, sem abrir o player)
+
+Investigado ao vivo em 2026-07-13 (Playwright), pra viabilizar mapear um anime sem
+abrir o player (que a plataforma registra como "começado"). Testado nas mesmas
+duas URLs de T1/T2 usadas acima.
+
+Diferente do CR, aqui **não precisa do player pra nada**: o `pvDetailId` já vem
+da própria URL (como sempre), e a página de detalhe sozinha já expõe temporada +
+título via `<meta name="title">` (não é `og:title` — é um `<meta name="title">`
+simples):
+
+```html
+<meta name="title"
+      content="Assista à temporada 1 de De Caipira a Mestre Espadachim – Prime Video">
+```
+
+Confirmado em T1 (`"...temporada 1..."`) e T2 (`"...temporada 2..."`) — o número
+bate com o `pvDetailId` de cada URL. Regex (locale pt-BR):
+`/temporada\s+(\d+)\s+de\s+(.+?)\s+–\s+Prime Video$/i` → temporada + título limpo,
+sem sufixo (equivalente ao `.atvwebplayersdk-title-text` do player, mas sem
+precisar abrir nada).
+
+**Cuidado de locale:** essa frase é montada no idioma da própria página da
+Amazon (o mesmo servida pro `region=na` no teste), não no idioma da UI da
+extensão — em inglês provavelmente vira algo como `"Watch season 1 of ... -
+Prime Video"`. A extração final precisa de um regex tolerante a pelo menos
+pt-BR/en, ou usar só o dígito da temporada (`/(\d+)/` isolado após validar que a
+frase é sobre temporada) como fallback mais robusto a variações de fraseado.
+
+Como o `pvDetailId` já é por-temporada (não precisa compor com `seasonNumber`
+pra formar a chave, só usa o número pra exibição/confirmação), esse dado nem é
+estritamente necessário pro mapeamento em si — é mais uma checagem de sanidade
+e fonte de título pra busca no MAL.
