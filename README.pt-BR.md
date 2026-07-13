@@ -18,16 +18,26 @@ Interface disponível em **pt-BR** e **en** (o Chrome escolhe pelo idioma do nav
 
 ## Como funciona
 
-1. **Crunchyroll:** numa página `/watch/`, a extensão lê do JSON-LD da página qual é a
-   série, a temporada e o número do episódio (`docs/cr-extraction.md`).
-   **Prime Video:** com o player aberto (o site não navega para uma URL própria — o player
-   é um overlay sobre `/detail/...`), a extensão lê a série/temporada/episódio direto do
-   DOM do player (`docs/pv-extraction.md`).
-2. Você clica no ícone da extensão → o popup mostra o episódio detectado.
+1. **Crunchyroll:** numa página de episódio (`/watch/...`), a extensão lê do JSON-LD da
+   página qual é a série, a temporada e o número do episódio. Na página da série
+   (`/series/{id}/...`) — sem episódio aberto — lê o ID da série na URL e a temporada
+   direto do seletor de temporada da própria página (`docs/cr-extraction.md`).
+   **Prime Video:** com o player aberto, a extensão lê a série/temporada/episódio direto do
+   overlay do player. Na página de detalhe (`/detail/{id}`) — sem o player aberto — lê a
+   temporada e o título dos metadados da página; o próprio ID de detalhe já é por-temporada
+   (`docs/pv-extraction.md`).
+2. Você clica no ícone da extensão → o popup mostra o que foi detectado.
 3. Na **primeira vez** de cada temporada, você casa a série com o anime certo no MAL (busca
-   automática por título, ou colando a URL/ID do MAL). Esse mapeamento fica salvo.
-4. A partir daí, é só clicar em **Gravar** — a extensão faz `PATCH` do
-   `num_watched_episodes` no MAL.
+   automática por título, ou colando a URL/ID do MAL).
+4. A partir daí, duas opções:
+   - **Gravar** — faz `PATCH` do `num_watched_episodes` no MAL (e **Finalizar** pra fechar
+     a temporada).
+   - **Para assistir** — salva o mapeamento sem gravar progresso nenhum. Se o anime ainda
+     não estiver em nenhuma lista do MAL, também marca status `plan_to_watch` lá (0
+     episódios); se já estiver numa lista, só o mapeamento local é salvo — o progresso
+     existente nunca é tocado. Útil pra guardar algo que você ainda não começou a assistir,
+     direto da página do próprio anime — sem que o Crunchyroll ou o Prime Video registrem o
+     episódio como "aberto".
 
 O mapeamento é guardado por **temporada**: no Crunchyroll, `crSeriesId#Stemporada` (ex.:
 `GT00371630#S1`); no Prime Video, `pv:<detailId>` (ex.: `pv:0GZCWV7IOJ8M9624JD5A4HA66B`) —
@@ -66,15 +76,19 @@ existe) é digitado por você e fica apenas no `chrome.storage.local` da sua má
 
 ## Uso
 
-- **Crunchyroll:** abra um episódio (`/watch/...`) e clique no ícone da extensão.
-- **Prime Video:** dê play no episódio (o player precisa estar aberto — a extração lê o
-  overlay do player) e clique no ícone da extensão.
-- **Temporada nova:** busque/escolha o anime no MAL (ou cole a URL/ID), ajuste o nº do
-  episódio se precisar, e clique em **Gravar**.
+- **Crunchyroll:** abra um episódio (`/watch/...`) — ou só a página da série
+  (`/series/...`), se você só quiser guardar pra depois — e clique no ícone da extensão.
+- **Prime Video:** dê play no episódio, ou só abra a página de detalhe do anime
+  (`/detail/...`) sem tocar nada, e clique no ícone da extensão.
+- **Temporada nova:** busque/escolha o anime no MAL (ou cole a URL/ID) e depois:
+  - ajuste o nº do episódio e clique em **Gravar** (ou **Finalizar** pra fechar a
+    temporada), ou
+  - clique em **Para assistir** pra guardar sem gravar progresso.
 - **Temporada já mapeada:** o popup mostra o alvo no MAL e seu progresso atual; ajuste o nº
-  se quiser e clique em **Gravar**. Para fechar a temporada, use **Finalizar**.
-- **Ver mapeamentos:** lista tudo que já foi mapeado, com opção de abrir no MAL
-  (**MAL ↗**), **re-mapear** ou **apagar**.
+  se quiser e clique em **Gravar**.
+- **Ver mapeamentos:** lista tudo que já foi mapeado, com um botão que abre a página do
+  anime na plataforma de origem (**CR ↗** / **PV ↗**, colorido por plataforma), além das
+  opções de abrir no MAL (**MAL ↗**), **re-mapear** ou **apagar**.
 - **MAL ↗:** tanto na tela do episódio quanto na de mapeamentos, abre a página do anime no
   MyAnimeList numa aba nova.
 
@@ -97,6 +111,14 @@ existe) é digitado por você e fica apenas no `chrome.storage.local` da sua má
   total quando conhecido.
 - **Nunca sobrescreve datas:** início e fim só são preenchidos quando estão vazios; uma
   data já existente no MAL é preservada.
+- **"Para assistir" nunca sobrescreve progresso:** só define status `plan_to_watch` no MAL
+  se o anime ainda não estiver em nenhuma lista. Se já estiver `watching`, `completed`
+  etc., clicar nele só grava o mapeamento local — seu status/progresso no MAL fica
+  intocado.
+- **Sem progresso local:** a extensão não guarda cópia local de "episódios assistidos" —
+  esse número sempre vive no MAL e é lido ao vivo de lá quando você abre o popup pra um
+  anime já mapeado. O que fica salvo localmente (`chrome.storage`) é só o vínculo
+  Crunchyroll/Prime Video ↔ MAL em si.
 
 ## Estrutura
 
@@ -115,9 +137,10 @@ extension/
     popup.html/js   # a interface (máquina de estados), com strings via chrome.i18n
   icons/
 docs/
-  contexto.md       # contexto e plano de implementação
-  cr-extraction.md  # investigação da página /watch/ do Crunchyroll (fonte da extração)
-  pv-extraction.md  # investigação do player do Prime Video (fonte da extração)
+  contexto.md                        # contexto e plano de implementação
+  contexto-mapeamento-sem-gravar.md  # plano da feature "Para assistir"
+  cr-extraction.md  # investigação das páginas de episódio/série do Crunchyroll (fonte da extração)
+  pv-extraction.md  # investigação do player/página de detalhe do Prime Video (fonte da extração)
 ```
 
 ## Escopo atual

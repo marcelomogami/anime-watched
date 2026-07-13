@@ -19,16 +19,26 @@ language).
 
 ## How it works
 
-1. **Crunchyroll:** on a `/watch/` page, the extension reads the series, season, and
-   episode number from the page's JSON-LD (`docs/cr-extraction.md`).
-   **Prime Video:** with the player open (the site doesn't navigate to its own URL — the
-   player is an overlay on top of `/detail/...`), the extension reads
-   series/season/episode straight from the player's DOM (`docs/pv-extraction.md`).
-2. Click the extension icon → the popup shows the detected episode.
-3. The **first time** for each season, you match the series to the right anime on MAL
-   (automatic search by title, or paste the MAL URL/ID). That mapping is saved.
-4. From then on, just click **Save** — the extension `PATCH`es
-   `num_watched_episodes` on MAL.
+1. **Crunchyroll:** on an episode page (`/watch/...`), the extension reads the series,
+   season, and episode number from the page's JSON-LD. On the series page
+   (`/series/{id}/...`) — no episode open — it reads the series ID from the URL and the
+   season from the page's own season selector (`docs/cr-extraction.md`).
+   **Prime Video:** with the player open, the extension reads series/season/episode
+   straight from the player's DOM overlay. On the detail page (`/detail/{id}`) — no player
+   open — it reads season and title from the page's metadata; the detail ID itself is
+   already season-specific (`docs/pv-extraction.md`).
+2. Click the extension icon → the popup shows what it detected.
+3. The **first time** for each season, you match it to the right anime on MAL (automatic
+   search by title, or paste the MAL URL/ID).
+4. From there, two options:
+   - **Save** — `PATCH`es `num_watched_episodes` on MAL (and **Finish** to close out the
+     season).
+   - **Plan to watch** — saves the mapping without recording any progress. If the anime
+     isn't in any MAL list yet, this also sets its status to `plan_to_watch` there (0
+     episodes); if it's already in a list, only the local mapping is saved — existing
+     progress is never touched. Useful for bookmarking something you haven't started yet,
+     straight from the anime's own page — without Crunchyroll or Prime Video recording the
+     episode as "opened".
 
 Mappings are stored per **season**: on Crunchyroll, `crSeriesId#SseasonNumber` (e.g.,
 `GT00371630#S1`); on Prime Video, `pv:<detailId>` (e.g., `pv:0GZCWV7IOJ8M9624JD5A4HA66B`)
@@ -68,16 +78,19 @@ never embedded in the code or committed.
 
 ## Usage
 
-- **Crunchyroll:** open an episode (`/watch/...`) and click the extension icon.
-- **Prime Video:** press play on the episode (the player needs to be open — extraction
-  reads the player overlay) and click the extension icon.
-- **New season:** search/pick the anime on MAL (or paste the URL/ID), adjust the episode
-  number if needed, and click **Save**.
+- **Crunchyroll:** open an episode (`/watch/...`) — or just the series page
+  (`/series/...`), if you only want to bookmark it — and click the extension icon.
+- **Prime Video:** press play on the episode, or just open the anime's detail page
+  (`/detail/...`) without playing anything, and click the extension icon.
+- **New season:** search/pick the anime on MAL (or paste the URL/ID), then either:
+  - adjust the episode number and click **Save** (or **Finish** to close out the season),
+    or
+  - click **Plan to watch** to bookmark it without recording any progress.
 - **Season already mapped:** the popup shows the MAL target and your current progress;
-  adjust the number if you want and click **Save**. To close out the season, use
-  **Finish**.
-- **View mappings:** lists everything mapped so far, with the option to open it on MAL
-  (**MAL ↗**), **re-map**, or **delete**.
+  adjust the number if you want and click **Save**.
+- **View mappings:** lists everything mapped so far, with a button that opens the anime's
+  page on the source platform (**CR ↗** / **PV ↗**, colored by platform), plus the options
+  to open it on MAL (**MAL ↗**), **re-map**, or **delete**.
 - **MAL ↗:** on both the episode screen and the mappings screen, opens the anime's page on
   MyAnimeList in a new tab.
 
@@ -101,6 +114,13 @@ never embedded in the code or committed.
   when it's known.
 - **Never overwrites dates:** start and finish dates are only filled in when empty; an
   existing date on MAL is preserved.
+- **"Plan to watch" never overwrites progress:** it only sets the `plan_to_watch` status on
+  MAL if the anime isn't in any list yet. If it's already `watching`, `completed`, etc.,
+  clicking it just saves the local mapping — your MAL status/progress stays untouched.
+- **No local progress tracking:** the extension doesn't keep a local copy of "episodes
+  watched" — that number always lives on MAL and is read live from there when you open the
+  popup for an already-mapped anime. What's stored locally (`chrome.storage`) is only the
+  Crunchyroll/Prime Video ↔ MAL mapping itself.
 
 ## Structure
 
@@ -119,9 +139,10 @@ extension/
     popup.html/js   # the interface (state machine), strings via chrome.i18n
   icons/
 docs/
-  contexto.md       # context and implementation plan (pt-BR)
-  cr-extraction.md  # investigation of Crunchyroll's /watch/ page (extraction source)
-  pv-extraction.md  # investigation of the Prime Video player (extraction source)
+  contexto.md                        # context and implementation plan (pt-BR)
+  contexto-mapeamento-sem-gravar.md  # design notes for "Plan to watch" (pt-BR)
+  cr-extraction.md  # investigation of Crunchyroll's episode/series pages (extraction source)
+  pv-extraction.md  # investigation of the Prime Video player/detail page (extraction source)
 ```
 
 ## Current scope
