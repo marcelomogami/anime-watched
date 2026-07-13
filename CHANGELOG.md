@@ -5,6 +5,22 @@ Todas as mudanças relevantes deste projeto são documentadas aqui.
 O formato segue [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/)
 e o projeto adota [Versionamento Semântico](https://semver.org/lang/pt-BR/).
 
+## [0.2.1] — 2026-07-12
+
+### Adicionado
+
+- **Badge de origem (CR/PV) na lista de mapeamentos:** cada mapeamento salvo agora grava um
+  campo `site` (`cr`/`pv`), exibido como selo colorido antes do título. Mapeamentos salvos
+  antes dessa mudança não têm o campo — cai no fallback de inferir pelo formato da chave
+  (só existia Crunchyroll antes do suporte a múltiplos sites, então a ausência do prefixo
+  `pv:` já identifica CR com segurança).
+- Screenshots do popup (`docs/screenshots/`) referenciadas no README.
+
+### Corrigido
+
+- Título (H1) do README ainda estava com o nome antigo da extensão
+  (`Crunchyroll/Prime Video → MyAnimeList`) — corrigido para **"Anime Watched"**.
+
 ## [0.2.0] — 2026-07-12
 
 ### Adicionado
@@ -18,17 +34,11 @@ e o projeto adota [Versionamento Semântico](https://semver.org/lang/pt-BR/).
 - **Mapeamento por temporada no Prime Video:** chave `pv:<detailId>` — cada temporada já
   tem seu próprio `detail/<ID>` na Amazon, então (diferente do CR) não precisa compor com
   o número da temporada.
-- **Badge de origem (CR/PV) na lista de mapeamentos:** cada mapeamento salvo agora grava um
-  campo `site` (`cr`/`pv`), exibido como selo colorido antes do título. Mapeamentos salvos
-  antes dessa mudança não têm o campo — cai no fallback de inferir pelo formato da chave
-  (só existia Crunchyroll antes do suporte a múltiplos sites, então a ausência do prefixo
-  `pv:` já identifica CR com segurança).
-- Screenshots do popup (`docs/screenshots/`) referenciadas no README.
 
 ### Alterado
 
 - Nome da extensão passa a ser **"Anime Watched"** (mesmo nome do projeto), no lugar de
-  `Crunchyroll/Prime Video → MyAnimeList` — inclui o título (H1) do README.
+  `Crunchyroll/Prime Video → MyAnimeList`.
 - Mensagens de "nenhum episódio detectado" no popup generalizadas por site
   (`NOT_SUPPORTED_SITE`, `NOT_A_WATCH_PAGE`, `NO_PLAYER_OPEN`).
 
@@ -89,6 +99,7 @@ episódio assistido no Crunchyroll, pelo botão da extensão na barra.
 - Sem detecção automática de fim de episódio, sem score/rewatch, sem publicação na
   Chrome Web Store (uso pessoal, carregado unpacked).
 
+[0.2.1]: https://github.com/marcelomogami/anime-watched/releases/tag/v0.2.1
 [0.2.0]: https://github.com/marcelomogami/anime-watched/releases/tag/v0.2.0
 [0.1.1]: https://github.com/marcelomogami/anime-watched/releases/tag/v0.1.1
 [0.1.0]: https://github.com/marcelomogami/anime-watched/releases/tag/v0.1.0

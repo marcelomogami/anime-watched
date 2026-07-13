@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Anime Watched",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Grava rapidamente no MyAnimeList o episódio que você acabou de ver no Crunchyroll ou no Prime Video.",
   "permissions": ["storage", "identity", "scripting", "activeTab"],
   "host_permissions": [
