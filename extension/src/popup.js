@@ -152,8 +152,10 @@ async function showEpisode() {
   remapOnly = false;
   $('epTitle').textContent = currentEpisode.seriesTitle || tr('episodeFallback');
   $('epMeta').textContent =
-    `S${currentEpisode.seasonNumber} · ep ${currentEpisode.episodeNumber}` +
-    (currentEpisode.displayId ? ` · ${currentEpisode.displayId}` : '');
+    tr('epMetaFormat', {
+      season: currentEpisode.seasonNumber,
+      episode: currentEpisode.episodeNumber,
+    }) + (currentEpisode.displayId ? ` · ${currentEpisode.displayId}` : '');
   showCard('mainCard');
 
   if (!currentEpisode.mapKey) {

@@ -20,6 +20,7 @@
   "pasteUrlPlaceholder": { "message": "myanimelist.net/anime/12345 ou 12345" },
   "useBtn": { "message": "Usar" },
   "epNumLabel": { "message": "Gravar episódio nº" },
+  "epMetaFormat": { "message": "S{season} · ep {episode}" },
   "saveBtnLabel": { "message": "Gravar no MyAnimeList" },
   "completeBtnTitle": { "message": "Marca como concluído e define o fim como hoje" },
   "completeBtnLabel": { "message": "Finalizar" },

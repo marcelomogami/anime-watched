@@ -5,6 +5,14 @@ All notable changes to this project are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 and the project adopts [Semantic Versioning](https://semver.org/).
 
+## [0.3.6] — 2026-07-13
+
+### Fixed
+
+- The episode header (`S{season} · ep {episode}`) was the last hardcoded,
+  non-localized string in the popup UI. It now goes through the same
+  `chrome.i18n` mechanism as the rest of the interface (`epMetaFormat` key).
+
 ## [0.3.5] — 2026-07-13
 
 ### Added
