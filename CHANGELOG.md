@@ -5,6 +5,15 @@ Todas as mudanças relevantes deste projeto são documentadas aqui.
 O formato segue [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/)
 e o projeto adota [Versionamento Semântico](https://semver.org/lang/pt-BR/).
 
+## [0.3.1] — 2026-07-13
+
+### Adicionado
+
+- **`README.en.md`:** tradução completa do README para inglês, com screenshots próprias
+  (`docs/screenshots/*-en.png`) geradas interceptando `chrome.i18n.getMessage` no popup
+  pra servir o `en/messages.json` sem depender do idioma do navegador/SO. Links cruzados
+  no topo dos dois READMEs (`Read this in English` / `Leia isso em português`).
+
 ## [0.3.0] — 2026-07-13
 
 ### Adicionado
@@ -112,6 +121,7 @@ episódio assistido no Crunchyroll, pelo botão da extensão na barra.
 - Sem detecção automática de fim de episódio, sem score/rewatch, sem publicação na
   Chrome Web Store (uso pessoal, carregado unpacked).
 
+[0.3.1]: https://github.com/marcelomogami/anime-watched/releases/tag/v0.3.1
 [0.3.0]: https://github.com/marcelomogami/anime-watched/releases/tag/v0.3.0
 [0.2.1]: https://github.com/marcelomogami/anime-watched/releases/tag/v0.2.1
 [0.2.0]: https://github.com/marcelomogami/anime-watched/releases/tag/v0.2.0
