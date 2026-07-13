@@ -5,6 +5,19 @@ Todas as mudanças relevantes deste projeto são documentadas aqui.
 O formato segue [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/)
 e o projeto adota [Versionamento Semântico](https://semver.org/lang/pt-BR/).
 
+## [0.3.0] — 2026-07-13
+
+### Adicionado
+
+- **Internacionalização (pt-BR + en):** interface do popup passa a usar `chrome.i18n`
+  (`_locales/pt_BR/messages.json` e `_locales/en/messages.json`, 67 chaves). O Chrome
+  escolhe o idioma sozinho pelo locale do navegador; `manifest.json` também usa
+  `__MSG_extDescription__`. Strings dinâmicas (mensagens de erro, progresso, avisos) usam
+  um helper `tr(key, vars)` com placeholders `{token}` — mais simples que o esquema nativo
+  `$1`/`$2` do `chrome.i18n` pra mensagens com várias variáveis. Texto estático do HTML usa
+  atributos `data-i18n`/`data-i18n-placeholder`/`data-i18n-title`/`data-i18n-html`,
+  preenchidos no load do popup.
+
 ## [0.2.1] — 2026-07-12
 
 ### Adicionado
@@ -99,6 +112,7 @@ episódio assistido no Crunchyroll, pelo botão da extensão na barra.
 - Sem detecção automática de fim de episódio, sem score/rewatch, sem publicação na
   Chrome Web Store (uso pessoal, carregado unpacked).
 
+[0.3.0]: https://github.com/marcelomogami/anime-watched/releases/tag/v0.3.0
 [0.2.1]: https://github.com/marcelomogami/anime-watched/releases/tag/v0.2.1
 [0.2.0]: https://github.com/marcelomogami/anime-watched/releases/tag/v0.2.0
 [0.1.1]: https://github.com/marcelomogami/anime-watched/releases/tag/v0.1.1

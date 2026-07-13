@@ -3,6 +3,36 @@
 
 const $ = (id) => document.getElementById(id);
 
+// i18n: mensagens vêm de _locales/<lang>/messages.json. Placeholders são {token},
+// substituídos aqui (mais simples que o esquema nativo $1/$2 do chrome.i18n pra
+// mensagens com várias variáveis).
+function tr(key, vars) {
+  let s = chrome.i18n.getMessage(key) || key;
+  if (vars) {
+    for (const [k, v] of Object.entries(vars)) {
+      s = s.split(`{${k}}`).join(v);
+    }
+  }
+  return s;
+}
+
+// Preenche todo texto estático marcado com data-i18n* no HTML.
+function applyStaticI18n() {
+  for (const el of document.querySelectorAll('[data-i18n]')) {
+    el.textContent = tr(el.dataset.i18n);
+  }
+  for (const el of document.querySelectorAll('[data-i18n-html]')) {
+    el.innerHTML = tr(el.dataset.i18nHtml);
+  }
+  for (const el of document.querySelectorAll('[data-i18n-placeholder]')) {
+    el.placeholder = tr(el.dataset.i18nPlaceholder);
+  }
+  for (const el of document.querySelectorAll('[data-i18n-title]')) {
+    el.title = tr(el.dataset.i18nTitle);
+  }
+}
+applyStaticI18n();
+
 function send(msg) {
   return new Promise((resolve) =>
     chrome.runtime.sendMessage(msg, (resp) => {
@@ -63,14 +93,18 @@ function todayStr() {
 function renderProgress() {
   const t = currentTarget;
   if (!t) return;
-  const totalTxt = t.total ? ` de ${t.total}` : '';
+  const watched = t.currentWatched || 0;
   const base =
-    t.inList || (t.currentWatched || 0) > 0
-      ? `MAL já tem: ${t.currentWatched || 0}${totalTxt} ep`
-      : `ainda não está na sua lista${t.total ? ' · ' + t.total + ' ep' : ''}`;
+    t.inList || watched > 0
+      ? t.total
+        ? tr('malHasProgressWithTotal', { watched, total: t.total })
+        : tr('malHasProgressNoTotal', { watched })
+      : t.total
+        ? tr('notInListWithTotal', { total: t.total })
+        : tr('notInListNoTotal');
   const dt = [
-    t.startDate ? `início ${t.startDate}` : '',
-    t.finishDate ? `fim ${t.finishDate}` : '',
+    t.startDate ? tr('startDateLabel', { date: t.startDate }) : '',
+    t.finishDate ? tr('finishDateLabel', { date: t.finishDate }) : '',
   ]
     .filter(Boolean)
     .join(' · ');
@@ -100,22 +134,23 @@ async function showSetup(status) {
 // ---------- EPISÓDIO ----------
 
 const NOWATCH_MESSAGES = {
-  NOT_SUPPORTED_SITE: 'Abra um episódio no Crunchyroll ou no Prime Video.',
-  NOT_A_WATCH_PAGE: 'Abra a página de um episódio no Crunchyroll.',
-  NO_PLAYER_OPEN: 'Dê play no episódio no Prime Video (o player precisa estar aberto).',
+  NOT_SUPPORTED_SITE: 'errNotSupportedSite',
+  NOT_A_WATCH_PAGE: 'errNotAWatchPage',
+  NO_PLAYER_OPEN: 'errNoPlayerOpen',
 };
 
 async function showEpisode() {
   const resp = await send({ type: 'GET_CURRENT_EPISODE' });
   if (!resp.ok) {
-    $('nowatchMsg').textContent =
-      NOWATCH_MESSAGES[resp.error] || 'Não consegui ler o episódio nesta página.';
+    $('nowatchMsg').textContent = tr(
+      NOWATCH_MESSAGES[resp.error] || 'errCouldNotReadEpisode',
+    );
     showCard('nowatchCard');
     return;
   }
   currentEpisode = resp.data;
   remapOnly = false;
-  $('epTitle').textContent = currentEpisode.seriesTitle || 'Episódio';
+  $('epTitle').textContent = currentEpisode.seriesTitle || tr('episodeFallback');
   $('epMeta').textContent =
     `S${currentEpisode.seasonNumber} · ep ${currentEpisode.episodeNumber}` +
     (currentEpisode.displayId ? ` · ${currentEpisode.displayId}` : '');
@@ -125,7 +160,7 @@ async function showEpisode() {
     // sem id da série (fallback og do CR): não dá pra mapear por temporada
     $('pickArea').classList.add('hidden');
     $('targetArea').classList.add('hidden');
-    setMsg('Não identifiquei a série do Crunchyroll. Recarregue a página do episódio.', 'err');
+    setMsg(tr('errCouldNotIdentifySeries'), 'err');
     return;
   }
 
@@ -148,16 +183,16 @@ function showPick() {
   const seed = cleanTitleGuess(currentEpisode.seriesTitle);
   $('searchQuery').value = seed;
   $('malUrl').value = '';
-  $('candidates').innerHTML = '<div class="muted">Buscando…</div>';
+  $('candidates').innerHTML = `<div class="muted">${tr('searching')}</div>`;
   runSearch(seed);
 }
 
 async function runSearch(query) {
   if (!query) return;
-  $('candidates').innerHTML = '<div class="muted">Buscando…</div>';
+  $('candidates').innerHTML = `<div class="muted">${tr('searching')}</div>`;
   const resp = await send({ type: 'SEARCH', query });
   if (!resp.ok) {
-    $('candidates').innerHTML = `<div class="muted">${escapeHtml(resp.error || 'busca falhou')}</div>`;
+    $('candidates').innerHTML = `<div class="muted">${escapeHtml(resp.error || tr('errSearchFailed'))}</div>`;
     return;
   }
   renderCandidates(resp.candidates);
@@ -167,7 +202,7 @@ function renderCandidates(list) {
   const box = $('candidates');
   box.innerHTML = '';
   if (!list || list.length === 0) {
-    box.innerHTML = '<div class="muted">Nenhum resultado. Tente outro termo ou cole a URL do MAL.</div>';
+    box.innerHTML = `<div class="muted">${tr('noSearchResults')}</div>`;
     return;
   }
   for (const c of list) {
@@ -184,7 +219,7 @@ function renderCandidates(list) {
       </div>`;
     const btn = document.createElement('button');
     btn.className = 'mal';
-    btn.textContent = 'Escolher';
+    btn.textContent = tr('chooseBtn');
     btn.onclick = () =>
       selectTarget({ id: c.id, title: c.title, total: c.numEpisodes || 0, picture: c.picture });
     div.appendChild(btn);
@@ -211,7 +246,7 @@ async function selectTarget(target) {
         savedAt: Date.now(),
       },
     });
-    setMsg(`✓ Mapeado para ${target.title}.`, 'ok');
+    setMsg(tr('mappedTo', { title: target.title }), 'ok');
     openMappings();
     return;
   }
@@ -219,7 +254,7 @@ async function selectTarget(target) {
   $('pickArea').classList.add('hidden');
   $('targetArea').classList.remove('hidden');
   $('regressWarn').classList.add('hidden');
-  $('saveBtn').textContent = 'Gravar no MyAnimeList';
+  $('saveBtn').textContent = tr('saveBtnLabel');
   $('targetTitle').textContent = target.title;
   const img = $('targetImg');
   if (target.picture) {
@@ -230,7 +265,7 @@ async function selectTarget(target) {
     img.classList.add('hidden');
   }
   $('epNum').value = String(currentEpisode.episodeNumber ?? '');
-  $('targetProgress').textContent = 'lendo progresso no MAL…';
+  $('targetProgress').textContent = tr('readingProgress');
 
   const ls = await send({ type: 'GET_LIST_STATUS', animeId: target.id });
   if (ls.ok) {
@@ -244,7 +279,7 @@ async function selectTarget(target) {
     renderProgress();
     updateRegressWarn();
   } else {
-    $('targetProgress').textContent = 'não consegui ler o progresso atual';
+    $('targetProgress').textContent = tr('errCouldNotReadProgress');
   }
 }
 
@@ -253,12 +288,12 @@ function updateRegressWarn() {
   const cur = currentTarget?.currentWatched;
   const w = $('regressWarn');
   if (Number.isFinite(num) && cur != null && num < cur) {
-    w.textContent = `Atenção: o MAL já marca ${cur}. Gravar ${num} vai reduzir seu progresso.`;
+    w.textContent = tr('regressWarning', { cur, num });
     w.classList.remove('hidden');
-    if (!forceWrite) $('saveBtn').textContent = 'Gravar mesmo assim';
+    if (!forceWrite) $('saveBtn').textContent = tr('saveBtnForce');
   } else {
     w.classList.add('hidden');
-    if (!forceWrite) $('saveBtn').textContent = 'Gravar no MyAnimeList';
+    if (!forceWrite) $('saveBtn').textContent = tr('saveBtnLabel');
   }
 }
 
@@ -280,7 +315,7 @@ function computeDates(num, completed) {
 // Grava no MAL (usado por "Gravar" e "Finalizar"). completed força status completed.
 async function writeToMal(num, completed) {
   const dates = computeDates(num, completed);
-  setMsg(completed ? 'Finalizando…' : 'Gravando…');
+  setMsg(completed ? tr('finishingMsg') : tr('savingMsg'));
   const resp = await send({
     type: 'UPDATE_EPISODES',
     animeId: currentTarget.id,
@@ -290,7 +325,7 @@ async function writeToMal(num, completed) {
     completed,
   });
   if (!resp.ok) {
-    setMsg(resp.error || 'Falha ao gravar.', 'err');
+    setMsg(resp.error || tr('errFailedToSave'), 'err');
     return;
   }
   // upsert do mapeamento (garante que fica salvo)
@@ -318,17 +353,17 @@ async function writeToMal(num, completed) {
   updateRegressWarn();
   renderProgress();
   const extras = [];
-  if (dates.start_date) extras.push('início hoje');
-  if (dates.finish_date) extras.push('fim hoje');
-  if (currentTarget.status === 'completed') extras.push('concluído');
+  if (dates.start_date) extras.push(tr('startedTodayTag'));
+  if (dates.finish_date) extras.push(tr('finishedTodayTag'));
+  if (currentTarget.status === 'completed') extras.push(tr('completedTag'));
   const suffix = extras.length ? ' · ' + extras.join(' · ') : '';
-  setMsg(`✓ ${currentTarget.title} — episódio ${num} gravado${suffix}.`, 'ok');
+  setMsg(tr('savedMsg', { title: currentTarget.title, num, suffix }), 'ok');
 }
 
 async function onSave() {
   const num = parseInt($('epNum').value, 10);
   if (!Number.isFinite(num) || num < 0) {
-    setMsg('Número de episódio inválido.', 'err');
+    setMsg(tr('errInvalidEpisodeNumber'), 'err');
     return;
   }
   const cur = currentTarget.currentWatched;
@@ -336,7 +371,7 @@ async function onSave() {
     // primeira tentativa de reduzir: exige segundo clique
     forceWrite = true;
     updateRegressWarn();
-    setMsg('Clique novamente para confirmar a redução.', '');
+    setMsg(tr('confirmReduceMsg'), '');
     return;
   }
   await writeToMal(num, false);
@@ -350,7 +385,7 @@ async function onComplete() {
     $('epNum').value = String(num);
   }
   if (!Number.isFinite(num) || num < 0) {
-    setMsg('Número de episódio inválido para finalizar.', 'err');
+    setMsg(tr('errInvalidEpisodeNumberComplete'), 'err');
     return;
   }
   await writeToMal(num, true);
@@ -371,7 +406,7 @@ async function openMappings() {
   list.innerHTML = '';
   const entries = Object.entries((resp.ok && resp.mappings) || {});
   if (entries.length === 0) {
-    list.innerHTML = '<div class="muted">Nenhum mapeamento ainda.</div>';
+    list.innerHTML = `<div class="muted">${tr('noMappingsYet')}</div>`;
   }
   for (const [key, val] of entries) {
     const site = siteOf(key, val);
@@ -390,11 +425,11 @@ async function openMappings() {
     open.onclick = () => openMal(val.malAnimeId);
     const remap = document.createElement('button');
     remap.className = 'ghost';
-    remap.textContent = 're-mapear';
+    remap.textContent = tr('remapBtn');
     remap.onclick = () => startRemap(key, val);
     const del = document.createElement('button');
     del.className = 'danger';
-    del.textContent = 'apagar';
+    del.textContent = tr('deleteBtn');
     del.onclick = async () => {
       await send({ type: 'REMOVE_MAPPING', mapKey: key });
       openMappings();
@@ -416,7 +451,7 @@ function startRemap(mapKey, val) {
     site: siteOf(mapKey, val),
   };
   remapOnly = true;
-  $('epTitle').textContent = 'Re-mapear';
+  $('epTitle').textContent = tr('remapTitle');
   $('epMeta').textContent = mapKey;
   $('targetArea').classList.add('hidden');
   showCard('mainCard');
@@ -428,7 +463,7 @@ function startRemap(mapKey, val) {
 async function render() {
   const s = await send({ type: 'GET_STATUS' });
   if (!s.ok) {
-    setMsg(s.error || 'Erro ao obter status.', 'err');
+    setMsg(s.error || tr('errCouldNotGetStatus'), 'err');
     return;
   }
   $('statusDot').classList.toggle('on', !!s.loggedIn);
@@ -445,17 +480,17 @@ $('saveCreds').onclick = async () => {
   const r1 = await send({ type: 'SET_CLIENT_ID', clientId: $('clientId').value });
   const r2 = await send({ type: 'SET_CLIENT_SECRET', clientSecret: $('clientSecret').value });
   const ok = r1.ok && r2.ok;
-  setMsg(ok ? 'Credenciais salvas.' : r1.error || r2.error, ok ? 'ok' : 'err');
+  setMsg(ok ? tr('credsSaved') : r1.error || r2.error, ok ? 'ok' : 'err');
 };
 
 $('loginBtn').onclick = async () => {
-  setMsg('Abrindo login do MAL…');
+  setMsg(tr('openingLogin'));
   const resp = await send({ type: 'LOGIN' });
   if (resp.ok) {
-    setMsg('✓ Autenticado.', 'ok');
+    setMsg(tr('authenticated'), 'ok');
     render();
   } else {
-    setMsg(resp.error || 'Falha no login.', 'err');
+    setMsg(resp.error || tr('errLoginFailed'), 'err');
   }
 };
 
@@ -467,10 +502,10 @@ $('searchQuery').addEventListener('keydown', (e) => {
 $('useUrlBtn').onclick = async () => {
   const id = parseMalId($('malUrl').value);
   if (!id) {
-    setMsg('URL/ID do MAL inválido.', 'err');
+    setMsg(tr('errInvalidMalUrl'), 'err');
     return;
   }
-  setMsg('Buscando anime…');
+  setMsg(tr('searchingAnime'));
   const resp = await send({ type: 'GET_ANIME', animeId: id });
   if (resp.ok) {
     setMsg('');
@@ -481,7 +516,7 @@ $('useUrlBtn').onclick = async () => {
       picture: resp.anime.picture,
     });
   } else {
-    setMsg(resp.error || 'Anime não encontrado.', 'err');
+    setMsg(resp.error || tr('errAnimeNotFound'), 'err');
   }
 };
 

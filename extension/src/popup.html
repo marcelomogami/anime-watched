@@ -110,25 +110,28 @@
 
     <!-- [1] SETUP -->
     <div class="card hidden" id="setupCard">
-      <label
-        >Redirect URI (registre no app do MAL em
-        <a class="ext" href="https://myanimelist.net/apiconfig" target="_blank">apiconfig</a>)</label
-      >
+      <label data-i18n-html="setupRedirectLabel"></label>
       <div class="mono" id="redirectUri">—</div>
-      <label style="margin-top: 8px">Client ID do MyAnimeList</label>
-      <input id="clientId" type="text" placeholder="cole aqui o Client ID" />
-      <label style="margin-top: 8px">Client Secret <span class="muted">(apps tipo "web" — deixe vazio se for "other")</span></label>
-      <input id="clientSecret" type="text" placeholder="cole o Client Secret (se houver)" />
+      <label style="margin-top: 8px" data-i18n="setupClientIdLabel"></label>
+      <input id="clientId" type="text" data-i18n-placeholder="setupClientIdPlaceholder" />
+      <label style="margin-top: 8px"
+        ><span data-i18n="setupClientSecretLabel"></span>
+        <span class="muted" data-i18n="setupClientSecretHint"></span
+      ></label>
+      <input id="clientSecret" type="text" data-i18n-placeholder="setupClientSecretPlaceholder" />
       <div class="row">
-        <button class="ghost grow" id="saveCreds">Salvar credenciais</button>
-        <button class="mal grow" id="loginBtn">Login no MAL</button>
+        <button class="ghost grow" id="saveCreds" data-i18n="setupSaveCredsBtn"></button>
+        <button class="mal grow" id="loginBtn" data-i18n="setupLoginBtn"></button>
       </div>
     </div>
 
     <!-- [4] Fora de /watch/ -->
     <div class="card hidden" id="nowatchCard">
-      <div class="muted" id="nowatchMsg">Abra um episódio no Crunchyroll ou no Prime Video.</div>
-      <div class="links"><a id="nw_showMappings">ver mapeamentos</a> · <a id="nw_setup">configuração</a></div>
+      <div class="muted" id="nowatchMsg"></div>
+      <div class="links">
+        <a id="nw_showMappings" data-i18n="linkShowMappings"></a> ·
+        <a id="nw_setup" data-i18n="linkSetup"></a>
+      </div>
     </div>
 
     <!-- [2]/[3] Episódio detectado -->
@@ -139,14 +142,14 @@
       <!-- [3] Escolher anime no MAL (não mapeado) -->
       <div class="hidden" id="pickArea">
         <div class="row tight">
-          <input id="searchQuery" class="grow" type="text" placeholder="buscar no MAL…" />
-          <button class="ghost" id="searchBtn">Buscar</button>
+          <input id="searchQuery" class="grow" type="text" data-i18n-placeholder="searchPlaceholder" />
+          <button class="ghost" id="searchBtn" data-i18n="searchBtn"></button>
         </div>
         <div id="candidates"></div>
-        <label style="margin-top: 10px">Não achou? Cole a URL ou ID do anime no MAL</label>
+        <label style="margin-top: 10px" data-i18n="pasteUrlLabel"></label>
         <div class="row tight">
-          <input id="malUrl" class="grow" type="text" placeholder="myanimelist.net/anime/12345 ou 12345" />
-          <button class="ghost" id="useUrlBtn">Usar</button>
+          <input id="malUrl" class="grow" type="text" data-i18n-placeholder="pasteUrlPlaceholder" />
+          <button class="ghost" id="useUrlBtn" data-i18n="useBtn"></button>
         </div>
       </div>
 
@@ -160,18 +163,18 @@
           </div>
         </div>
         <div class="row">
-          <label style="margin: 0">Gravar episódio nº</label>
+          <label style="margin: 0" data-i18n="epNumLabel"></label>
           <input id="epNum" class="ep" type="text" />
         </div>
         <div class="warn hidden" id="regressWarn"></div>
         <div class="row" style="margin-top: 10px">
-          <button class="primary grow" id="saveBtn">Gravar no MyAnimeList</button>
-          <button class="done" id="completeBtn" title="Marca como concluído e define o fim como hoje">Finalizar</button>
+          <button class="primary grow" id="saveBtn" data-i18n="saveBtnLabel"></button>
+          <button class="done" id="completeBtn" data-i18n="completeBtnLabel" data-i18n-title="completeBtnTitle"></button>
         </div>
         <div class="btnrow">
           <button class="mal" id="openMal">MAL ↗</button>
-          <button class="ghost" id="remapLink">trocar anime</button>
-          <button class="ghost" id="showMappings">ver mapeamentos</button>
+          <button class="ghost" id="remapLink" data-i18n="changeAnimeBtn"></button>
+          <button class="ghost" id="showMappings" data-i18n="viewMappingsBtn"></button>
         </div>
       </div>
     </div>
@@ -179,10 +182,10 @@
     <!-- [5] Gestão de mapeamentos -->
     <div class="card hidden" id="mappingsCard">
       <div class="row" style="margin: 0 0 6px; justify-content: space-between">
-        <strong style="font-size: 12px">Mapeamentos salvos</strong>
-        <button class="ghost" id="backFromMappings" style="padding: 4px 8px">Voltar</button>
+        <strong style="font-size: 12px" data-i18n="mappingsTitle"></strong>
+        <button class="ghost" id="backFromMappings" style="padding: 4px 8px" data-i18n="backBtn"></button>
       </div>
-      <div id="mappingsList"><div class="muted">Nenhum mapeamento ainda.</div></div>
+      <div id="mappingsList"><div class="muted" data-i18n="noMappingsYet"></div></div>
     </div>
 
     <div id="msg"></div>

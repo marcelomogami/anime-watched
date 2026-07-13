@@ -6,6 +6,8 @@ ver no **Crunchyroll** ou no **Prime Video** na sua lista do **MyAnimeList (MAL)
 Sem servidor, sem backend: OAuth, chamadas ao MAL e o mapa de mapeamentos vivem inteiros
 dentro da extensão (`chrome.storage`).
 
+Interface disponível em **pt-BR** e **en** (o Chrome escolhe pelo idioma do navegador).
+
 ## Screenshots
 
 | Episódio detectado → gravar | Buscar/escolher no MAL | Gestão de mapeamentos |
@@ -99,13 +101,16 @@ existe) é digitado por você e fica apenas no `chrome.storage.local` da sua má
 ```
 extension/
   manifest.json
+  _locales/
+    pt_BR/messages.json  # strings da interface (idioma padrão)
+    en/messages.json     # strings da interface (inglês)
   src/
     background.js   # orquestra: detecta o site, lê o episódio da aba, chama o MAL, guarda o mapa
     content.js      # roda no Crunchyroll: extrai série/temporada/episódio do JSON-LD
     content-pv.js   # roda no Prime Video: extrai série/temporada/episódio do overlay do player
     mal.js          # cliente da API do MAL (OAuth PKCE, busca, gravar progresso)
     store.js        # wrapper de chrome.storage (config, tokens, mapa de mapeamentos)
-    popup.html/js   # a interface (máquina de estados)
+    popup.html/js   # a interface (máquina de estados), com strings via chrome.i18n
   icons/
 docs/
   contexto.md       # contexto e plano de implementação
