@@ -5,6 +5,14 @@ All notable changes to this project are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 and the project adopts [Semantic Versioning](https://semver.org/).
 
+## [0.3.5] — 2026-07-13
+
+### Added
+
+- Saved mappings now show a link button (`CR ↗` / `PV ↗`, colored per platform) that
+  opens the anime's page on the source platform directly, built from the mapping's
+  `mapKey` — no schema change or re-mapping needed for existing entries.
+
 ## [0.3.4] — 2026-07-13
 
 ### Changed

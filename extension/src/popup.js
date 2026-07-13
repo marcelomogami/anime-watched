@@ -400,6 +400,23 @@ function siteOf(key, val) {
 }
 const SITE_LABEL = { cr: 'CR', pv: 'PV' };
 
+// Reconstrói a URL da série/detail na plataforma de origem a partir do mapKey
+// (CR: "{crSeriesId}#S{n}" → /series/{id}; PV: "pv:{detailId}" → /detail/{id}).
+function siteUrl(key, val) {
+  const site = siteOf(key, val);
+  if (site === 'pv') {
+    const id = key.startsWith('pv:') ? key.slice(3) : '';
+    return id ? `https://www.primevideo.com/detail/${id}` : null;
+  }
+  const id = key.split('#')[0];
+  return id ? `https://www.crunchyroll.com/series/${id}` : null;
+}
+
+function openSite(url) {
+  if (!url) return;
+  chrome.tabs.create({ url });
+}
+
 async function openMappings() {
   const resp = await send({ type: 'GET_ALL_MAPPINGS' });
   const list = $('mappingsList');
@@ -414,11 +431,17 @@ async function openMappings() {
     row.className = 'maprow';
     row.innerHTML = `
       <div class="info">
-        <div class="v"><span class="src-badge ${site}">${SITE_LABEL[site]}</span>${escapeHtml(val.malTitle || '?')}</div>
+        <div class="v">${escapeHtml(val.malTitle || '?')}</div>
         <div class="k">${escapeHtml(key)}${val.malNumEpisodes ? ' · ' + val.malNumEpisodes + ' ep' : ''}</div>
       </div>`;
     const actions = document.createElement('div');
     actions.className = 'actions';
+    const url = siteUrl(key, val);
+    const openSrc = document.createElement('button');
+    openSrc.className = `src ${site}`;
+    openSrc.textContent = `${SITE_LABEL[site]} ↗`;
+    openSrc.disabled = !url;
+    openSrc.onclick = () => openSite(url);
     const open = document.createElement('button');
     open.className = 'mal';
     open.textContent = 'MAL ↗';
@@ -434,6 +457,7 @@ async function openMappings() {
       await send({ type: 'REMOVE_MAPPING', mapKey: key });
       openMappings();
     };
+    actions.appendChild(openSrc);
     actions.appendChild(open);
     actions.appendChild(remap);
     actions.appendChild(del);
