@@ -5,6 +5,14 @@ All notable changes to this project are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 and the project adopts [Semantic Versioning](https://semver.org/).
 
+## [0.4.1] — 2026-07-13
+
+### Changed
+
+- READMEs (en/pt-BR) and popup screenshots updated to reflect v0.4.0: the "Plan to
+  watch" flow, mapping from the anime's own page (no episode/player needed), and the
+  `CR ↗` / `PV ↗` shortcut in the mappings list.
+
 ## [0.4.0] — 2026-07-13
 
 ### Added
