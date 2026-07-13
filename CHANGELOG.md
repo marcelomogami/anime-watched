@@ -5,6 +5,17 @@ All notable changes to this project are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 and the project adopts [Semantic Versioning](https://semver.org/).
 
+## [0.4.2] — 2026-07-13
+
+### Fixed
+
+- Mapping from the Crunchyroll series page (`Plan to watch` origin) failed for shows
+  whose season selector doesn't use the `S{n}: title` label format — e.g. "Clevatess"
+  ("Clevatess" / "Clevatess II" in the dropdown, "2ª Temporada" in pt-BR), where no
+  season number could be parsed. Season detection now also recognizes worded labels
+  ("2ª Temporada", "Season 2") and, when nothing matches, defaults to season 1 (the
+  page's default state) instead of failing outright.
+
 ## [0.4.1] — 2026-07-13
 
 ### Changed

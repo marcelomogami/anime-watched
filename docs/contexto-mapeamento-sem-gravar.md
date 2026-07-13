@@ -201,3 +201,17 @@ casos raros, se fizer sentido).
 
 Isso fecha as perguntas em aberto anteriores sobre a origem "página do anime" —
 não há mais bloqueio de investigação pra essa parte do plano.
+
+## Bug pós-implementação (2026-07-13): nem toda série usa `S{N}:`
+
+Em uso real, o anime "Clevatess" (2 temporadas, `"Clevatess"` /
+`"Clevatess II"` no dropdown — sem prefixo numérico, e `"2ª Temporada"` em
+pt-BR) quebrou a suposição de que só existe `S{N}: título` ou "sem dropdown".
+A extração de temporada em `content.js` (`seasonFromSeriesPage()`) ganhou um
+segundo regex pra rótulos por extenso (`/(\d+)\s*ª?\s*(temporada|season)/i`) e,
+quando nem esse bate, **assume temporada 1** em vez de falhar — troca "nunca
+mapeia série sem `S{N}:`" por "mapeia certo no caso comum (temporada 1, padrão
+da página) e erra só se o usuário estiver deliberadamente numa temporada
+seguinte com rótulo não reconhecido" (corrigível via "re-mapear"). Detalhes
+completos e a alternativa de API interna descartada (token preso ao locale da
+sessão) em `docs/cr-extraction.md`.

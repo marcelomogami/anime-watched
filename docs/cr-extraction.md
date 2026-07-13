@@ -108,31 +108,49 @@ uma temporada**). Elemento estável (classe sem hash de CSS module):
 </div>
 ```
 
-Texto no formato `S{N}: {Título}` — regex `/^S(\d+):/`. Confirmado que o texto
-**reflete a temporada atualmente selecionada no dropdown**, atualizando ao vivo
-quando o usuário troca de temporada pela UI (testado: trocar pra "S2: Attack on
-Titan Season 2" atualiza `.season-info` na hora). **A URL não muda** ao trocar de
-temporada — é só estado client-side. Isso implica: extrair o `seasonNumber`
-exige ler o DOM **no momento da extração**, não dá pra inferir só pela URL, e o
-usuário precisa estar com a temporada certa selecionada no dropdown antes de
-mapear.
+Confirmado que o texto **reflete a temporada atualmente selecionada no
+dropdown**, atualizando ao vivo quando o usuário troca de temporada pela UI
+(testado: trocar pra "S2: Attack on Titan Season 2" atualiza `.season-info` na
+hora). **A URL não muda** ao trocar de temporada — é só estado client-side.
+Isso implica: extrair o `seasonNumber` exige ler o DOM **no momento da
+extração**, não dá pra inferir só pela URL, e o usuário precisa estar com a
+temporada certa selecionada no dropdown antes de mapear.
 
-Casos observados no dropdown de "Attack on Titan": a maioria segue `S{N}: ...`,
-mas conteúdo bônus (`"Attack on Titan OADs"`, `"Attack on Titan: THE LAST
-ATTACK"`) não tem prefixo de temporada — não dá pra extrair `seasonNumber`
-confiável nesses itens.
+**Bug real encontrado em produção (2026-07-13) — nem toda série usa
+`S{N}: título`.** A hipótese inicial (regex `/^S(\d+):/` cobrindo o caso
+comum, com fallback pra "sem dropdown = temporada única") quebrou pro anime
+"Clevatess": a série tem 2 temporadas, mas os itens do dropdown são só
+`"Clevatess"` (temporada 1) e `"Clevatess II"` (temporada 2) — sem nenhum
+prefixo numérico. Em pt-BR, a mesma temporada 2 aparece como `"2ª Temporada"`
+(rótulo genérico do locale, também sem o formato `S{N}:`). Ou seja, a
+nomenclatura do item de temporada é curada por título no catálogo da CR, não
+segue uma convenção única — varia por série *e* por locale.
 
-### Fallback: série com 1 temporada só
+Cheguei a investigar uma alternativa via API interna
+(`content/v2/cms/series/{id}/seasons`, que retorna `season_number` explícito
+por temporada — a fonte estruturada real por trás do dropdown), mas ela exige
+um token de sessão vinculado ao locale exato da página; pedir com um locale
+diferente do da sessão atual devolve `401 invalid_auth_token`. Não dá pra
+prever de forma confiável qual locale usar sem já ter uma chamada bem-sucedida
+pra copiar, e reverse-engineer esse token foge do padrão do projeto de "ler
+só o que está exposto no DOM/metadados públicos" (mesma decisão já tomada em
+`docs/pv-extraction.md` sobre não interceptar `fetch`/`XHR`).
 
-Quando a série só tem uma temporada, o dropdown **nem existe** —
-`.season-info` retorna `null` (confirmado em "Daemons of the Shadow Realm").
-Nesse caso é seguro assumir `seasonNumber = 1` sem ambiguidade.
-
-### Resumo da lógica de extração proposta
+### Heurística final (com fallback pra temporada 1)
 
 ```
 seasonEl = document.querySelector('.season-info')
-if (!seasonEl) → seasonNumber = 1                       // série de temporada única
-else if (match = seasonEl.textContent.match(/^S(\d+):/)) → seasonNumber = match[1]
-else → sem season number confiável (conteúdo bônus/filme) → não dá pra mapear por aqui
+if (!seasonEl) → seasonNumber = 1                             // série de temporada única
+else if (match = texto.match(/^S(\d+):/)) → seasonNumber = match[1]           // "S2: Título"
+else if (match = texto.match(/(\d+)\s*ª?\s*(temporada|season)/i)) → seasonNumber = match[1]  // "2ª Temporada"
+else → seasonNumber = 1   // não deu pra parsear ("Clevatess", "Clevatess II") — assume
+                          // o estado padrão da página (temporada 1) em vez de falhar
 ```
+
+O último fallback é uma aposta deliberada: a maioria das vezes que alguém abre
+a página da série do zero, ela mostra a temporada 1 por padrão (confirmado com
+"Attack on Titan"). Se o usuário estiver deliberadamente numa temporada
+seguinte cujo rótulo não bate com nenhum dos padrões conhecidos, o mapeamento
+sai errado — mas isso é corrigível depois pelo "re-mapear", e é estritamente
+melhor que falhar sempre que a série não usa `S{N}:` (que era o caso comum
+quebrado, não uma exceção rara).

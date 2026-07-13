@@ -70,13 +70,22 @@
   }
 
   // Lê a temporada selecionada no dropdown da página da série (ver docs/cr-extraction.md,
-  // seção "Extração na página da série"). Retorna 1 se o dropdown nem existe (série de
-  // temporada única) ou null se existe mas não tem prefixo "S{n}:" (conteúdo bônus/filme).
+  // seção "Extração na página da série"). Nem toda série segue a convenção "S{n}: título"
+  // no rótulo do dropdown — algumas usam só o nome ("Clevatess", "Clevatess II") ou o
+  // rótulo genérico do locale ("2ª Temporada"), sem número óbvio. Tenta os dois formatos
+  // conhecidos; se nenhum bater (ou o dropdown nem existir — série de temporada única),
+  // assume temporada 1 (estado padrão da página ao abrir) em vez de falhar — se o usuário
+  // estiver deliberadamente numa temporada seguinte sem conseguirmos ler o número, o
+  // "re-mapear" corrige depois.
   function seasonFromSeriesPage() {
     const el = document.querySelector('.season-info');
     if (!el) return 1;
-    const m = (el.textContent || '').trim().match(/^S(\d+):/);
-    return m ? Number(m[1]) : null;
+    const text = (el.textContent || '').trim();
+    const numbered = text.match(/^S(\d+):/);
+    if (numbered) return Number(numbered[1]);
+    const worded = text.match(/(\d+)\s*ª?\s*(?:temporada|season)/i);
+    if (worded) return Number(worded[1]);
+    return 1;
   }
 
   // Extrai série+temporada da página /series/{id}/..., sem depender de um episódio
