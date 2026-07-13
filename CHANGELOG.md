@@ -1,9 +1,21 @@
 # Changelog
 
+*[Read this in English](CHANGELOG.en.md)*
+
 Todas as mudanças relevantes deste projeto são documentadas aqui.
 
 O formato segue [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/)
 e o projeto adota [Versionamento Semântico](https://semver.org/lang/pt-BR/).
+
+## [0.3.2] — 2026-07-13
+
+### Alterado
+
+- **`default_locale` da extensão passa de `pt_BR` para `en`:** só afeta o fallback do
+  `chrome.i18n` quando o idioma do navegador não bate com nenhum locale enviado (nem
+  `pt_BR` nem `en`) — nesses casos agora cai em inglês em vez de português.
+- `CHANGELOG.en.md`: tradução completa do changelog para inglês, com link cruzado no topo
+  dos dois arquivos.
 
 ## [0.3.1] — 2026-07-13
 
@@ -121,6 +133,7 @@ episódio assistido no Crunchyroll, pelo botão da extensão na barra.
 - Sem detecção automática de fim de episódio, sem score/rewatch, sem publicação na
   Chrome Web Store (uso pessoal, carregado unpacked).
 
+[0.3.2]: https://github.com/marcelomogami/anime-watched/releases/tag/v0.3.2
 [0.3.1]: https://github.com/marcelomogami/anime-watched/releases/tag/v0.3.1
 [0.3.0]: https://github.com/marcelomogami/anime-watched/releases/tag/v0.3.0
 [0.2.1]: https://github.com/marcelomogami/anime-watched/releases/tag/v0.2.1
