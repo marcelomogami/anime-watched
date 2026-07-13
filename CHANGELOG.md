@@ -5,6 +5,13 @@ All notable changes to this project are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 and the project adopts [Semantic Versioning](https://semver.org/).
 
+## [0.3.4] — 2026-07-13
+
+### Changed
+
+- New extension icon (eye illustration) replacing the previous placeholder, resized to
+  16/48/128px. Source image kept at `extension/icons/original.png`.
+
 ## [0.3.3] — 2026-07-13
 
 ### Changed
