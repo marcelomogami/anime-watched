@@ -19,23 +19,29 @@ Interface disponível em **pt-BR** e **en** (o Chrome escolhe pelo idioma do nav
 
 ## Como funciona
 
-1. **Crunchyroll:** numa página de episódio (`/watch/...`), a extensão lê do JSON-LD da
-   página qual é a série, a temporada e o número do episódio. Na página da série
-   (`/series/{id}/...`) — sem episódio aberto — lê o ID da série na URL e a temporada
-   direto do seletor de temporada da própria página (`docs/cr-extraction.md`).
-   **Prime Video:** com o player aberto, a extensão lê a série/temporada/episódio direto do
-   overlay do player. Na página de detalhe (`/detail/{id}`) — sem o player aberto — lê a
-   temporada e o título dos metadados da página; o próprio ID de detalhe já é por-temporada
-   (`docs/pv-extraction.md`).
-2. Escolha o **provider** (MAL ou AniList) na tela de configuração — um fica ativo por vez,
-   trocável a qualquer momento pelo botão **⚙** no cabeçalho. Cada um mantém o próprio login.
+São duas escolhas independentes que se juntam aqui: a **source** — Crunchyroll ou Prime
+Video, detectada automaticamente pela aba em que você está — e o **provider** — MAL ou
+AniList, escolhido por você — é onde o progresso de fato fica registrado.
+
+1. **Extração (por source):**
+   - **Crunchyroll:** numa página de episódio (`/watch/...`), lê do JSON-LD da página qual
+     é a série, a temporada e o número do episódio. Na página da série (`/series/{id}/...`)
+     — sem episódio aberto — lê o ID da série na URL e a temporada direto do seletor de
+     temporada da própria página (`docs/cr-extraction.md`).
+   - **Prime Video:** com o player aberto, lê a série/temporada/episódio direto do overlay
+     do player. Na página de detalhe (`/detail/{id}`) — sem o player aberto — lê a
+     temporada e o título dos metadados da página; o próprio ID de detalhe já é
+     por-temporada (`docs/pv-extraction.md`).
+2. **Configurar o provider:** escolha MAL ou AniList na tela de configuração — um fica
+   ativo por vez, trocável a qualquer momento pelo botão **⚙** no cabeçalho. Cada um mantém
+   o próprio login.
 3. Você clica no ícone da extensão → o popup mostra o que foi detectado.
-4. Na **primeira vez** de cada temporada, você casa a série com o anime certo no provider
-   ativo (busca automática por título — os sinônimos multilíngue do AniList lidam bem
-   melhor com os títulos traduzidos do Prime Video do que a busca simples do MAL — ou
-   colando a URL/ID do provider). Se aquela temporada já estava mapeada no outro provider, a
-   extensão tenta resolver sozinha via cross-reference `idMal` do AniList antes de pedir pra
-   buscar de novo.
+4. **Primeira vez de cada temporada:** você casa a série com o anime certo no provider
+   ativo — busca automática por título (os sinônimos multilíngue do AniList lidam bem
+   melhor com os títulos traduzidos do Prime Video do que a busca simples do MAL), ou
+   colando a URL/ID do provider. Se aquela temporada já estava mapeada no *outro* provider,
+   a extensão tenta resolver sozinha via cross-reference `idMal` do AniList antes de pedir
+   pra buscar de novo.
 5. A partir daí, duas opções:
    - **Gravar** — atualiza o número de episódios assistidos no provider (e **Finalizar**
      pra fechar a temporada).
@@ -104,6 +110,21 @@ existe) é digitado por você e fica apenas no `chrome.storage.local` da sua má
 Os tokens de acesso do AniList duram cerca de um ano e não têm renovação automática —
 quando expirar, é só logar de novo.
 
+## Notas de segurança
+
+O `chrome.storage.local` — onde a autenticação fica (Client ID/Secret, tokens de
+acesso/refresh) — não é criptografado em disco; é LevelDB puro. Fica isolado de outras
+extensões e de qualquer site que você visite, mas não de qualquer coisa com acesso de
+leitura local ao seu perfil do Chrome (malware, outro usuário do sistema, etc.). É uma
+separação deliberada: só o mapa de mapeamentos sincroniza via `chrome.storage.sync` — ele
+não guarda nenhuma credencial, só as chaves de vínculo Crunchyroll/Prime Video ↔ provider.
+
+Se em algum momento suspeitar que um token vazou, revogue o acesso direto nas
+configurações do próprio provider —
+[myanimelist.net/apiconfig](https://myanimelist.net/apiconfig) pro MAL,
+[anilist.co/settings/developer](https://anilist.co/settings/developer) pro AniList — isso
+invalida na hora, sem precisar mexer na extensão.
+
 ## Uso
 
 - **Crunchyroll:** abra um episódio (`/watch/...`) — ou só a página da série
@@ -162,24 +183,24 @@ extension/
     pt_BR/messages.json  # strings da interface (idioma padrão)
     en/messages.json     # strings da interface (inglês)
   src/
-    background.js       # orquestra: detecta a source, lê o episódio da aba, roteia pro provider ativo, guarda o mapa
+    background.js  # orquestra: detecta a source, lê o episódio da aba, roteia pro provider ativo, guarda o mapa
     sources/
-      crunchyroll.js         # roda no Crunchyroll: extrai série/temporada/episódio do JSON-LD
-      primevideo.js           # roda no Prime Video: extrai série/temporada/episódio do overlay do player
+      crunchyroll.js  # extrai série/temporada/episódio do JSON-LD do Crunchyroll
+      primevideo.js   # extrai série/temporada/episódio do overlay do player do Prime Video
     providers/
-      index.js               # registro dos providers (mal, anilist)
-      mal.js                  # cliente da API do MAL (OAuth PKCE, busca, gravar progresso)
-      anilist.js              # cliente da API do AniList (OAuth Implicit Grant, busca/progresso via GraphQL)
-      shared.js               # helpers reaproveitados entre providers (parse de ID, cross-reference MAL↔AniList)
-    store.js             # wrapper de chrome.storage (config, tokens, mapa de mapeamentos — namespaced por provider)
-    popup.html/js        # a interface (máquina de estados), com strings via chrome.i18n
+      index.js    # registro dos providers (mal, anilist)
+      mal.js      # cliente da API do MAL (OAuth PKCE, busca, gravar progresso)
+      anilist.js  # cliente da API do AniList (OAuth Implicit Grant, busca/progresso via GraphQL)
+      shared.js   # helpers reaproveitados entre providers (parse de ID, cross-reference MAL↔AniList)
+    store.js       # wrapper de chrome.storage (config, tokens, mapa de mapeamentos — namespaced por provider)
+    popup.html/js  # a interface (máquina de estados), com strings via chrome.i18n
   icons/
 docs/
   contexto.md                        # contexto e plano de implementação
   contexto-mapeamento-sem-gravar.md  # plano da feature "Para assistir"
   contexto-providers.md              # plano da camada de providers / suporte a AniList
-  cr-extraction.md  # investigação das páginas de episódio/série do Crunchyroll (fonte da extração)
-  pv-extraction.md  # investigação do player/página de detalhe do Prime Video (fonte da extração)
+  cr-extraction.md                   # investigação das páginas de episódio/série do Crunchyroll (fonte da extração)
+  pv-extraction.md                   # investigação do player/página de detalhe do Prime Video (fonte da extração)
 ```
 
 ## Escopo atual

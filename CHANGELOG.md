@@ -5,6 +5,21 @@ All notable changes to this project are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 and the project adopts [Semantic Versioning](https://semver.org/).
 
+## [0.5.2] — 2026-07-15
+
+### Changed
+
+- **README (en/pt-BR) revised** now that the provider layer has settled: "How it works"
+  opens by naming the two independent axes — *source* (Crunchyroll/Prime Video, detected)
+  and *provider* (MAL/AniList, picked) — instead of leaving the split implicit; the
+  Crunchyroll/Prime Video extraction step split into clear sub-bullets instead of one dense
+  paragraph; the `Structure` file tree's comment alignment fixed in both languages.
+- **New "Security notes" section:** `chrome.storage.local` (where auth — Client ID/Secret,
+  access/refresh tokens — lives) isn't encrypted at rest, isolated from other extensions
+  and web pages but not from local machine access; the mapping table is the only thing
+  that syncs (`chrome.storage.sync`), and it holds no credentials. Includes how to revoke
+  access from each provider if a token is ever suspected leaked.
+
 ## [0.5.1] — 2026-07-14
 
 ### Added
