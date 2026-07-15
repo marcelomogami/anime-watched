@@ -3,18 +3,19 @@
 *[Read this in English](README.md)*
 
 Extensão de Chrome (Manifest V3) que grava, com um clique, o episódio que você acabou de
-ver no **Crunchyroll** ou no **Prime Video** na sua lista do **MyAnimeList (MAL)**.
+ver no **Crunchyroll** ou no **Prime Video** na sua lista de anime — no **MyAnimeList
+(MAL)** ou no **AniList**, o que você escolher como provider ativo.
 
-Sem servidor, sem backend: OAuth, chamadas ao MAL e o mapa de mapeamentos vivem inteiros
-dentro da extensão (`chrome.storage`).
+Sem servidor, sem backend: OAuth, chamadas à API do provider e o mapa de mapeamentos vivem
+inteiros dentro da extensão (`chrome.storage`).
 
 Interface disponível em **pt-BR** e **en** (o Chrome escolhe pelo idioma do navegador).
 
 ## Screenshots
 
-| Episódio detectado → gravar | Buscar/escolher no MAL | Gestão de mapeamentos |
+| Episódio detectado → gravar | Buscar/escolher no provider | Gestão de mapeamentos |
 |---|---|---|
-| ![Popup com episódio detectado e anime já mapeado](docs/screenshots/popup-main.png) | ![Popup com resultados de busca no MAL](docs/screenshots/popup-search.png) | ![Tela de gestão de mapeamentos salvos](docs/screenshots/popup-mappings.png) |
+| ![Popup com episódio detectado e anime já mapeado](docs/screenshots/popup-main.png) | ![Popup com resultados de busca](docs/screenshots/popup-search.png) | ![Tela de gestão de mapeamentos salvos](docs/screenshots/popup-mappings.png) |
 
 ## Como funciona
 
@@ -26,23 +27,32 @@ Interface disponível em **pt-BR** e **en** (o Chrome escolhe pelo idioma do nav
    overlay do player. Na página de detalhe (`/detail/{id}`) — sem o player aberto — lê a
    temporada e o título dos metadados da página; o próprio ID de detalhe já é por-temporada
    (`docs/pv-extraction.md`).
-2. Você clica no ícone da extensão → o popup mostra o que foi detectado.
-3. Na **primeira vez** de cada temporada, você casa a série com o anime certo no MAL (busca
-   automática por título, ou colando a URL/ID do MAL).
-4. A partir daí, duas opções:
-   - **Gravar** — faz `PATCH` do `num_watched_episodes` no MAL (e **Finalizar** pra fechar
-     a temporada).
+2. Escolha o **provider** (MAL ou AniList) na tela de configuração — um fica ativo por vez,
+   trocável a qualquer momento pelo botão **⚙** no cabeçalho. Cada um mantém o próprio login.
+3. Você clica no ícone da extensão → o popup mostra o que foi detectado.
+4. Na **primeira vez** de cada temporada, você casa a série com o anime certo no provider
+   ativo (busca automática por título — os sinônimos multilíngue do AniList lidam bem
+   melhor com os títulos traduzidos do Prime Video do que a busca simples do MAL — ou
+   colando a URL/ID do provider). Se aquela temporada já estava mapeada no outro provider, a
+   extensão tenta resolver sozinha via cross-reference `idMal` do AniList antes de pedir pra
+   buscar de novo.
+5. A partir daí, duas opções:
+   - **Gravar** — atualiza o número de episódios assistidos no provider (e **Finalizar**
+     pra fechar a temporada).
    - **Para assistir** — salva o mapeamento sem gravar progresso nenhum. Se o anime ainda
-     não estiver em nenhuma lista do MAL, também marca status `plan_to_watch` lá (0
-     episódios); se já estiver numa lista, só o mapeamento local é salvo — o progresso
-     existente nunca é tocado. Útil pra guardar algo que você ainda não começou a assistir,
-     direto da página do próprio anime — sem que o Crunchyroll ou o Prime Video registrem o
-     episódio como "aberto".
+     não estiver em nenhuma lista, também marca status "para assistir" lá (0 episódios); se
+     já estiver numa lista, só o mapeamento local é salvo — o progresso existente nunca é
+     tocado. Útil pra guardar algo que você ainda não começou a assistir, direto da página
+     do próprio anime — sem que o Crunchyroll ou o Prime Video registrem o episódio como
+     "aberto".
 
 O mapeamento é guardado por **temporada**: no Crunchyroll, `crSeriesId#Stemporada` (ex.:
 `GT00371630#S1`); no Prime Video, `pv:<detailId>` (ex.: `pv:0GZCWV7IOJ8M9624JD5A4HA66B`) —
 cada temporada já tem o próprio `detail/<ID>` lá. Em ambos os casos resolve o caso comum de
-uma temporada ser uma entrada separada no MAL.
+uma temporada ser uma entrada separada no provider. Cada mapeamento guarda um alvo **por
+provider**, então trocar o provider ativo nunca descarta um mapeamento que você já tinha —
+na pior das hipóteses, só precisa mapear aquela temporada de novo no provider novo (e o
+cross-reference acima costuma evitar até isso).
 
 ## Instalação (unpacked)
 
@@ -52,12 +62,17 @@ uma temporada ser uma entrada separada no MAL.
 4. A extensão aparece na barra. Fixe o ícone se quiser.
 
 > O ID da extensão (e portanto o Redirect URI) é estável enquanto a pasta não mudar de
-> lugar. Se mover a pasta, o ID muda e o app do MAL precisa do novo Redirect URI.
+> lugar. Se mover a pasta, o ID muda e o app de cada provider precisa do novo Redirect URI.
 
-## Registrar o app no MyAnimeList
+## Registrar o app no provider
 
-1. Abra o popup da extensão e copie o **Redirect URI** mostrado
-   (`https://<extension-id>.chromiumapp.org/`).
+Escolha MAL, AniList, ou os dois — a extensão só exige credenciais do provider que estiver
+ativo.
+
+### MyAnimeList
+
+1. Abra o popup da extensão, escolha **MAL** como provider, e copie o **Redirect URI**
+   mostrado (`https://<extension-id>.chromiumapp.org/`).
 2. Vá em [myanimelist.net/apiconfig](https://myanimelist.net/apiconfig) →
    **Create ID**.
 3. Preencha:
@@ -74,51 +89,69 @@ O login usa OAuth2 com PKCE (método `plain`, exigência do MAL). O Client Secre
 existe) é digitado por você e fica apenas no `chrome.storage.local` da sua máquina — nunca
 é embutido no código nem versionado.
 
+### AniList
+
+1. Abra o popup da extensão, escolha **AniList** como provider, e copie o **Redirect URI**
+   mostrado.
+2. Vá em [anilist.co/settings/developer](https://anilist.co/settings/developer) →
+   **Create New Application**.
+3. Preencha um nome e cole o Redirect URI do passo 1.
+4. Salve e copie o **Client ID** (sem secret — o login do AniList usa o fluxo Implicit
+   Grant: a extensão recebe o token direto, sem etapa de troca no servidor).
+5. No popup da extensão: cole o **Client ID** → **Salvar credenciais** → **Login no
+   AniList** e autorize.
+
+Os tokens de acesso do AniList duram cerca de um ano e não têm renovação automática —
+quando expirar, é só logar de novo.
+
 ## Uso
 
 - **Crunchyroll:** abra um episódio (`/watch/...`) — ou só a página da série
   (`/series/...`), se você só quiser guardar pra depois — e clique no ícone da extensão.
 - **Prime Video:** dê play no episódio, ou só abra a página de detalhe do anime
   (`/detail/...`) sem tocar nada, e clique no ícone da extensão.
-- **Temporada nova:** busque/escolha o anime no MAL (ou cole a URL/ID) e depois:
+- **Temporada nova:** busque/escolha o anime no provider ativo (ou cole a URL/ID) e depois:
   - ajuste o nº do episódio e clique em **Gravar** (ou **Finalizar** pra fechar a
     temporada), ou
   - clique em **Para assistir** pra guardar sem gravar progresso.
-- **Temporada já mapeada:** o popup mostra o alvo no MAL e seu progresso atual; ajuste o nº
-  se quiser e clique em **Gravar**.
+- **Temporada já mapeada:** o popup mostra o alvo e seu progresso atual; ajuste o nº se
+  quiser e clique em **Gravar**.
 - **Ver mapeamentos:** lista tudo que já foi mapeado, com um botão que abre a página do
   anime na plataforma de origem (**CR ↗** / **PV ↗**, colorido por plataforma), além das
-  opções de abrir no MAL (**MAL ↗**), **re-mapear** ou **apagar**.
-- **MAL ↗:** tanto na tela do episódio quanto na de mapeamentos, abre a página do anime no
-  MyAnimeList numa aba nova.
+  opções de abrir no provider (**MAL ↗** / **AniList ↗**), **re-mapear** ou **apagar**.
+- **Trocar de provider:** o botão **⚙** no cabeçalho (ou a tela de configuração mostrada
+  antes de você logar) abre o seletor de provider a qualquer momento.
 
 ### Detalhes de comportamento
 
-- **Não retrocede sozinho:** se o MAL já marca um número maior que o episódio que você vai
-  gravar, a extensão avisa e pede um segundo clique antes de reduzir.
-- **Ajuste de episódio:** a numeração do Crunchyroll nem sempre bate com a do MAL (ex.:
-  cour com numeração absoluta) — por isso o número é editável antes de gravar.
-- **`status`:** vira `completed` quando o episódio atinge o total de episódios conhecido
-  no MAL; senão fica `watching`.
-- **Data de início automática:** ao gravar, se o progresso do MAL estiver em **0** (e o
-  start date vazio), define o início como **hoje**. A trava é o progresso zerado, não o
+- **Não retrocede sozinho:** se o provider já marca um número maior que o episódio que você
+  vai gravar, a extensão avisa e pede um segundo clique antes de reduzir.
+- **Ajuste de episódio:** a numeração do Crunchyroll nem sempre bate com a do provider
+  (ex.: cour com numeração absoluta) — por isso o número é editável antes de gravar.
+- **`status`:** vira "concluído" quando o episódio atinge o total de episódios conhecido no
+  provider; senão fica "assistindo".
+- **Data de início automática:** ao gravar, se o progresso no provider estiver em **0** (e
+  o start date vazio), define o início como **hoje**. A trava é o progresso zerado, não o
   número do episódio — assim funciona mesmo quando o Crunchyroll usa numeração sequencial
-  diferente do MAL (ex.: `E25` no CR = `S2E1` no MAL).
-- **Data de fim automática:** ao completar a temporada (nº ≥ total do MAL, com finish date
-  vazio), define o fim como **hoje**.
-- **Botão "Finalizar":** marca `completed` + fim = **hoje** explicitamente, útil quando o
-  MAL não conhece o total (simulcast/temporada em andamento). Ajusta o progresso para o
-  total quando conhecido.
+  diferente da do provider (ex.: `E25` no CR = `S2E1` lá).
+- **Data de fim automática:** ao completar a temporada (nº ≥ total do provider, com finish
+  date vazio), define o fim como **hoje**.
+- **Botão "Finalizar":** marca concluído + fim = **hoje** explicitamente, útil quando o
+  provider não conhece o total (simulcast/temporada em andamento). Ajusta o progresso para
+  o total quando conhecido.
 - **Nunca sobrescreve datas:** início e fim só são preenchidos quando estão vazios; uma
-  data já existente no MAL é preservada.
-- **"Para assistir" nunca sobrescreve progresso:** só define status `plan_to_watch` no MAL
-  se o anime ainda não estiver em nenhuma lista. Se já estiver `watching`, `completed`
-  etc., clicar nele só grava o mapeamento local — seu status/progresso no MAL fica
-  intocado.
+  data já existente no provider é preservada.
+- **"Para assistir" nunca sobrescreve progresso:** só define status "para assistir" no
+  provider se o anime ainda não estiver em nenhuma lista. Se já estiver assistindo,
+  concluído etc., clicar nele só grava o mapeamento local — seu status/progresso no
+  provider fica intocado.
 - **Sem progresso local:** a extensão não guarda cópia local de "episódios assistidos" —
-  esse número sempre vive no MAL e é lido ao vivo de lá quando você abre o popup pra um
-  anime já mapeado. O que fica salvo localmente (`chrome.storage`) é só o vínculo
-  Crunchyroll/Prime Video ↔ MAL em si.
+  esse número sempre vive no provider e é lido ao vivo de lá quando você abre o popup pra
+  um anime já mapeado. O que fica salvo localmente (`chrome.storage`) é o vínculo
+  Crunchyroll/Prime Video ↔ provider, por provider.
+- **Resolução entre providers:** se uma temporada já está mapeada num provider e você troca
+  pro outro, a extensão tenta o campo `idMal` do AniList pra resolver o vínculo sozinha
+  antes de cair na busca manual — funciona nos dois sentidos (MAL↔AniList).
 
 ## Estrutura
 
@@ -129,22 +162,28 @@ extension/
     pt_BR/messages.json  # strings da interface (idioma padrão)
     en/messages.json     # strings da interface (inglês)
   src/
-    background.js   # orquestra: detecta o site, lê o episódio da aba, chama o MAL, guarda o mapa
-    content.js      # roda no Crunchyroll: extrai série/temporada/episódio do JSON-LD
-    content-pv.js   # roda no Prime Video: extrai série/temporada/episódio do overlay do player
-    mal.js          # cliente da API do MAL (OAuth PKCE, busca, gravar progresso)
-    store.js        # wrapper de chrome.storage (config, tokens, mapa de mapeamentos)
-    popup.html/js   # a interface (máquina de estados), com strings via chrome.i18n
+    background.js       # orquestra: detecta a source, lê o episódio da aba, roteia pro provider ativo, guarda o mapa
+    sources/
+      crunchyroll.js         # roda no Crunchyroll: extrai série/temporada/episódio do JSON-LD
+      primevideo.js           # roda no Prime Video: extrai série/temporada/episódio do overlay do player
+    providers/
+      index.js               # registro dos providers (mal, anilist)
+      mal.js                  # cliente da API do MAL (OAuth PKCE, busca, gravar progresso)
+      anilist.js              # cliente da API do AniList (OAuth Implicit Grant, busca/progresso via GraphQL)
+      shared.js               # helpers reaproveitados entre providers (parse de ID, cross-reference MAL↔AniList)
+    store.js             # wrapper de chrome.storage (config, tokens, mapa de mapeamentos — namespaced por provider)
+    popup.html/js        # a interface (máquina de estados), com strings via chrome.i18n
   icons/
 docs/
   contexto.md                        # contexto e plano de implementação
   contexto-mapeamento-sem-gravar.md  # plano da feature "Para assistir"
+  contexto-providers.md              # plano da camada de providers / suporte a AniList
   cr-extraction.md  # investigação das páginas de episódio/série do Crunchyroll (fonte da extração)
   pv-extraction.md  # investigação do player/página de detalhe do Prime Video (fonte da extração)
 ```
 
 ## Escopo atual
 
-Crunchyroll e Prime Video (no Jellyfin, o plugin `jellyfin-ani-sync` já cobre). Sem
-detecção automática de fim de episódio, sem score/rewatch, sem publicação na Chrome Web
-Store — uso pessoal, carregado unpacked.
+Crunchyroll e Prime Video como sources (no Jellyfin, o plugin `jellyfin-ani-sync` já
+cobre); MAL e AniList como providers. Sem detecção automática de fim de episódio, sem
+score/rewatch, sem publicação na Chrome Web Store — uso pessoal, carregado unpacked.

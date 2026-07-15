@@ -1,14 +1,23 @@
 // store.js — wrapper de chrome.storage
-// - config (clientId) e tokens do MAL: chrome.storage.local
-// - mapa CR→MAL: chrome.storage.sync (sincroniza entre máquinas), fallback local
+// - config (clientId/secret) e tokens: namespaced por provider, chrome.storage.local
+// - provider ativo: chrome.storage.local
+// - mapa source→provider: chrome.storage.sync (sincroniza entre máquinas), fallback local
+//   cada entrada guarda um alvo por provider (`providers: { mal: {...}, anilist: {...} }`),
+//   pra não perder o vínculo com um provider ao trocar o provider ativo pra outro.
 
-const LOCAL_KEYS = {
-  clientId: 'mal_client_id',
-  clientSecret: 'mal_client_secret', // opcional (apps tipo "web" do MAL)
-  tokens: 'mal_tokens', // { access_token, refresh_token, expires_at }
-};
+const ACTIVE_PROVIDER_KEY = 'active_provider';
+const DEFAULT_PROVIDER = 'mal';
 
+const AUTH_PREFIX = 'auth/'; // chave: "auth/mal/client_id"
 const MAP_PREFIX = 'map:'; // chave: "map:GT00371630#S1"
+
+// Chaves antigas (pré-namespacing), só existiram pro MAL. Migradas por
+// self-heal na primeira leitura de cada uma — ver `readAuthValue` abaixo.
+const LEGACY_LOCAL_KEYS = {
+  client_id: 'mal_client_id',
+  client_secret: 'mal_client_secret',
+  tokens: 'mal_tokens',
+};
 
 function localGet(key) {
   return new Promise((resolve) =>
@@ -44,50 +53,132 @@ function syncSet(obj) {
   );
 }
 
+// Converte uma entrada de mapeamento do formato antigo (pré-providers, campos
+// `malAnimeId`/`malTitle`/`malNumEpisodes` soltos) pro formato novo
+// (`providers: { mal: { animeId, title, numEpisodes } }`). Entradas que já
+// estão no formato novo passam direto.
+function migrateMappingShape(raw) {
+  if (!raw) return null;
+  if (raw.providers) return raw;
+  if (raw.malAnimeId === undefined) return raw; // formato desconhecido: não mexe
+  const { malAnimeId, malTitle, malNumEpisodes, ...common } = raw;
+  return {
+    ...common,
+    providers: {
+      mal: {
+        animeId: malAnimeId,
+        title: malTitle,
+        numEpisodes: malNumEpisodes || 0,
+      },
+    },
+  };
+}
+
+// Lê uma chave de auth namespaced; se estiver vazia e existir uma chave
+// legada equivalente (só possível pro provider 'mal'), migra o valor pra
+// chave nova, apaga a antiga e retorna o valor migrado. Self-heal, mesmo
+// espírito da migração de mapeamentos.
+async function readAuthValue(providerId, suffix) {
+  const key = `${AUTH_PREFIX}${providerId}/${suffix}`;
+  const val = await localGet(key);
+  if (val !== undefined) return val;
+
+  const legacyKey = providerId === 'mal' ? LEGACY_LOCAL_KEYS[suffix] : undefined;
+  if (!legacyKey) return undefined;
+  const legacyVal = await localGet(legacyKey);
+  if (legacyVal === undefined) return undefined;
+
+  await localSet({ [key]: legacyVal });
+  await localRemove(legacyKey);
+  return legacyVal;
+}
+
 export const store = {
-  // --- config ---
-  async getClientId() {
-    return (await localGet(LOCAL_KEYS.clientId)) || '';
+  // --- provider ativo ---
+  async getActiveProvider() {
+    return (await localGet(ACTIVE_PROVIDER_KEY)) || DEFAULT_PROVIDER;
   },
-  async setClientId(id) {
-    return localSet({ [LOCAL_KEYS.clientId]: (id || '').trim() });
-  },
-  async getClientSecret() {
-    return (await localGet(LOCAL_KEYS.clientSecret)) || '';
-  },
-  async setClientSecret(secret) {
-    return localSet({ [LOCAL_KEYS.clientSecret]: (secret || '').trim() });
+  async setActiveProvider(providerId) {
+    return localSet({ [ACTIVE_PROVIDER_KEY]: providerId });
   },
 
-  // --- tokens ---
-  async getTokens() {
-    return (await localGet(LOCAL_KEYS.tokens)) || null;
+  // --- auth (namespaced por provider) ---
+  async getClientId(providerId) {
+    return (await readAuthValue(providerId, 'client_id')) || '';
   },
-  async setTokens(tokens) {
-    return localSet({ [LOCAL_KEYS.tokens]: tokens });
+  async setClientId(providerId, id) {
+    return localSet({
+      [`${AUTH_PREFIX}${providerId}/client_id`]: (id || '').trim(),
+    });
   },
-  async clearTokens() {
-    return localRemove(LOCAL_KEYS.tokens);
+  async getClientSecret(providerId) {
+    return (await readAuthValue(providerId, 'client_secret')) || '';
+  },
+  async setClientSecret(providerId, secret) {
+    return localSet({
+      [`${AUTH_PREFIX}${providerId}/client_secret`]: (secret || '').trim(),
+    });
   },
 
-  // --- mapa CR→MAL ---
-  async getMapping(key) {
-    return (await syncGet(MAP_PREFIX + key)) || null;
+  // --- tokens (namespaced por provider) ---
+  async getTokens(providerId) {
+    return (await readAuthValue(providerId, 'tokens')) || null;
   },
-  async setMapping(key, value) {
-    return syncSet({ [MAP_PREFIX + key]: value });
+  async setTokens(providerId, tokens) {
+    return localSet({ [`${AUTH_PREFIX}${providerId}/tokens`]: tokens });
   },
-  async getAllMappings() {
+  async clearTokens(providerId) {
+    return localRemove(`${AUTH_PREFIX}${providerId}/tokens`);
+  },
+
+  // --- mapa source→provider ---
+
+  // Retorna a entrada inteira (metadados comuns + alvo por provider já
+  // migrado), ou null se não existe.
+  async getMappingEntry(key) {
+    const raw = await syncGet(MAP_PREFIX + key);
+    const migrated = migrateMappingShape(raw);
+    if (migrated && migrated !== raw) {
+      // self-heal: persiste o formato novo já na primeira leitura
+      await syncSet({ [MAP_PREFIX + key]: migrated });
+    }
+    return migrated;
+  },
+
+  // Mescla `value` (shape { animeId, title, numEpisodes }) dentro de
+  // `providers[providerId]` da entrada, preservando outros providers e os
+  // metadados comuns já salvos (ex.: crSeriesTitle, site).
+  async setMappingProvider(key, providerId, value, commonFields = {}) {
+    const existing = (await store.getMappingEntry(key)) || { providers: {} };
+    const entry = {
+      ...existing,
+      ...commonFields,
+      providers: {
+        ...existing.providers,
+        [providerId]: value,
+      },
+    };
+    return syncSet({ [MAP_PREFIX + key]: entry });
+  },
+
+  async getAllMappingEntries() {
     return new Promise((resolve) =>
-      syncArea().get(null, (all) => {
+      syncArea().get(null, async (all) => {
         const out = {};
         for (const [k, v] of Object.entries(all)) {
-          if (k.startsWith(MAP_PREFIX)) out[k.slice(MAP_PREFIX.length)] = v;
+          if (k.startsWith(MAP_PREFIX)) {
+            const migrated = migrateMappingShape(v);
+            out[k.slice(MAP_PREFIX.length)] = migrated;
+            if (migrated !== v) {
+              await syncSet({ [k]: migrated }); // self-heal
+            }
+          }
         }
         resolve(out);
       }),
     );
   },
+
   async removeMapping(key) {
     return new Promise((resolve) => syncArea().remove(MAP_PREFIX + key, resolve));
   },

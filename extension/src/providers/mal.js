@@ -1,7 +1,11 @@
-// mal.js — cliente da API do MyAnimeList (OAuth2 PKCE + list status)
+// providers/mal.js — provider MyAnimeList (OAuth2 PKCE + list status).
 // MAL só suporta code_challenge_method=plain, então code_challenge == code_verifier.
+// Implementa o contrato descrito em docs/contexto-providers.md.
 
-import { store } from './store.js';
+import { store } from '../store.js';
+import { parseAnimeId, anilistIdToMalId } from './shared.js';
+
+const PROVIDER_ID = 'mal';
 
 const AUTH_URL = 'https://myanimelist.net/v1/oauth2/authorize';
 const TOKEN_URL = 'https://myanimelist.net/v1/oauth2/token';
@@ -23,15 +27,26 @@ function redirectUri() {
   return chrome.identity.getRedirectURL();
 }
 
-// --- OAuth ---
+// --- auth ---
 
-export function getRedirectUri() {
-  return redirectUri();
+export async function getAuthConfig() {
+  return {
+    clientId: await store.getClientId(PROVIDER_ID),
+    clientSecret: await store.getClientSecret(PROVIDER_ID),
+    redirectUri: redirectUri(),
+  };
+}
+
+export async function setAuthConfig({ clientId, clientSecret } = {}) {
+  if (clientId !== undefined) await store.setClientId(PROVIDER_ID, clientId);
+  if (clientSecret !== undefined) {
+    await store.setClientSecret(PROVIDER_ID, clientSecret);
+  }
 }
 
 // Inicia o fluxo interativo de login. Requer clientId já salvo.
 export async function login() {
-  const clientId = await store.getClientId();
+  const clientId = await store.getClientId(PROVIDER_ID);
   if (!clientId) throw new Error('Client ID do MAL não configurado.');
 
   const codeVerifier = genCodeVerifier();
@@ -76,7 +91,7 @@ export async function login() {
 }
 
 async function exchangeCode(clientId, code, codeVerifier) {
-  const clientSecret = await store.getClientSecret();
+  const clientSecret = await store.getClientSecret(PROVIDER_ID);
   const body = new URLSearchParams({
     client_id: clientId,
     grant_type: 'authorization_code',
@@ -99,9 +114,9 @@ async function exchangeCode(clientId, code, codeVerifier) {
 }
 
 async function refresh() {
-  const clientId = await store.getClientId();
-  const clientSecret = await store.getClientSecret();
-  const tokens = await store.getTokens();
+  const clientId = await store.getClientId(PROVIDER_ID);
+  const clientSecret = await store.getClientSecret(PROVIDER_ID);
+  const tokens = await store.getTokens(PROVIDER_ID);
   if (!tokens?.refresh_token) throw new Error('Sem refresh_token; refaça o login.');
   const body = new URLSearchParams({
     client_id: clientId,
@@ -116,7 +131,7 @@ async function refresh() {
   });
   if (!res.ok) {
     const t = await res.text();
-    await store.clearTokens();
+    await store.clearTokens(PROVIDER_ID);
     throw new Error(`Falha ao renovar token (${res.status}): ${t}`);
   }
   const data = await res.json();
@@ -125,7 +140,7 @@ async function refresh() {
 
 async function saveTokens(data) {
   const expiresAt = Date.now() + (data.expires_in || 2419200) * 1000 - 60000;
-  await store.setTokens({
+  await store.setTokens(PROVIDER_ID, {
     access_token: data.access_token,
     refresh_token: data.refresh_token,
     expires_at: expiresAt,
@@ -133,21 +148,21 @@ async function saveTokens(data) {
 }
 
 async function getAccessToken() {
-  const tokens = await store.getTokens();
+  const tokens = await store.getTokens(PROVIDER_ID);
   if (!tokens) throw new Error('NOT_LOGGED_IN');
   if (Date.now() >= tokens.expires_at) {
     await refresh();
-    return (await store.getTokens()).access_token;
+    return (await store.getTokens(PROVIDER_ID)).access_token;
   }
   return tokens.access_token;
 }
 
 export async function isLoggedIn() {
-  return !!(await store.getTokens());
+  return !!(await store.getTokens(PROVIDER_ID));
 }
 
 export async function logout() {
-  await store.clearTokens();
+  await store.clearTokens(PROVIDER_ID);
 }
 
 // --- chamadas autenticadas ---
@@ -233,11 +248,25 @@ export async function getListStatus(animeId) {
 
 // Extrai o anime_id de uma URL do MAL ou de um id numérico colado.
 // Aceita: "https://myanimelist.net/anime/12345/Slug", "myanimelist.net/anime/12345", "12345"
-export function parseMalId(input) {
-  const s = (input || '').trim();
-  if (/^\d+$/.test(s)) return Number(s);
-  const m = s.match(/anime\/(\d+)/);
-  return m ? Number(m[1]) : null;
+export const parseId = parseAnimeId;
+
+export function getDisplayUrl(animeId) {
+  return `https://myanimelist.net/anime/${animeId}`;
+}
+
+// Tenta achar o equivalente no MAL a partir do id de outro provider — hoje só
+// sabe cruzar com o AniList, usando o campo `idMal` que o próprio AniList
+// carrega (o MAL não tem um `idAnilist` pra fazer isso sozinho). Retorna null
+// (sem lançar) quando não encontra.
+export async function findByCrossRef(otherProviderId, otherAnimeId) {
+  if (otherProviderId !== 'anilist') return null;
+  const malId = await anilistIdToMalId(otherAnimeId);
+  if (!malId) return null;
+  try {
+    return await getAnime(malId);
+  } catch {
+    return null;
+  }
 }
 
 // Atualiza num_watched_episodes de um anime. numEpisodes = episódio dentro da temporada.
@@ -294,3 +323,9 @@ export async function setPlanToWatch(animeId) {
   }
   return res.json();
 }
+
+export const id = PROVIDER_ID;
+export const label = 'MAL';
+// Client secret é opcional pro MAL (só alguns tipos de app do MAL exigem) —
+// a UI de setup mostra o campo, mas não é obrigatório preencher.
+export const authFields = { clientSecret: true };

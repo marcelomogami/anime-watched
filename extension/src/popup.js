@@ -1,5 +1,7 @@
 // popup.js — máquina de estados da interface.
 // Estados: setup · fora-de-watch · episódio(pick/target) · gestão de mapeamentos.
+// Agnóstico a provider: fala só via mensagens com background.js, que resolve
+// tudo contra o provider ativo (MAL/AniList) — ver docs/contexto-providers.md.
 
 const $ = (id) => document.getElementById(id);
 
@@ -58,8 +60,8 @@ function escapeHtml(s) {
   );
 }
 
-// Extrai anime_id de URL do MAL ou id numérico.
-function parseMalId(input) {
+// Extrai um id numérico de URL "*/anime/{id}/*" (MAL e AniList) ou id colado.
+function parseAnimeId(input) {
   const s = (input || '').trim();
   if (/^\d+$/.test(s)) return Number(s);
   const m = s.match(/anime\/(\d+)/);
@@ -71,10 +73,16 @@ function cleanTitleGuess(title) {
   return (title || '').split(/\s[-|]\s/)[0].trim();
 }
 
-// Abre a página do anime no MyAnimeList numa nova aba.
-function openMal(animeId) {
-  if (!animeId) return;
-  chrome.tabs.create({ url: `https://myanimelist.net/anime/${animeId}` });
+// URL de onde criar/gerenciar o app OAuth de cada provider (só usada na tela
+// de setup, pro link de registro do redirect URI).
+const PROVIDER_APP_URL = {
+  mal: 'https://myanimelist.net/apiconfig',
+  anilist: 'https://anilist.co/settings/developer',
+};
+
+function openUrl(url) {
+  if (!url) return;
+  chrome.tabs.create({ url });
 }
 
 // Data de hoje no formato YYYY-MM-DD (fuso local).
@@ -97,8 +105,8 @@ function renderProgress() {
   const base =
     t.inList || watched > 0
       ? t.total
-        ? tr('malHasProgressWithTotal', { watched, total: t.total })
-        : tr('malHasProgressNoTotal', { watched })
+        ? tr('malHasProgressWithTotal', { watched, total: t.total, provider: providerLabel })
+        : tr('malHasProgressNoTotal', { watched, provider: providerLabel })
       : t.total
         ? tr('notInListWithTotal', { total: t.total })
         : tr('notInListNoTotal');
@@ -113,21 +121,57 @@ function renderProgress() {
 
 // --- estado em memória ---
 let currentEpisode = null; // { displayId, seasonNumber, episodeNumber, seriesTitle, mapKey, ... }
-let currentTarget = null; // { id, title, total, picture, currentWatched }
+let currentTarget = null; // { id, title, total, picture, url, currentWatched }
 let forceWrite = false; // confirma gravação que reduz progresso
 let remapOnly = false; // re-mapeando pela tela de gestão (não grava episódio)
+let providerId = 'mal';
+let providerLabel = 'MAL';
 
 const TOP_CARDS = ['setupCard', 'nowatchCard', 'mainCard', 'mappingsCard'];
 function showCard(id) {
   for (const c of TOP_CARDS) $(c).classList.toggle('hidden', c !== id);
 }
 
+// Reaplica os textos que dependem do provider ativo nos cards já visíveis
+// (rodado toda vez que o provider muda ou o status é recarregado).
+function applyProviderLabels() {
+  $('openMal').textContent = `${providerLabel} ↗`;
+  $('saveBtn').textContent = tr('saveBtnLabel', { provider: providerLabel });
+  $('searchQuery').placeholder = tr('searchPlaceholder', { provider: providerLabel });
+  $('pasteUrlLabel_').textContent = tr('pasteUrlLabel', { provider: providerLabel });
+  $('loginBtn').textContent = tr('setupLoginBtn', { provider: providerLabel });
+  $('clientIdLabel_').textContent = tr('setupClientIdLabel', { provider: providerLabel });
+  $('redirectLabel').innerHTML = tr('setupRedirectLabel', {
+    provider: providerLabel,
+    url: PROVIDER_APP_URL[providerId] || '#',
+  });
+}
+
 // ---------- SETUP ----------
 
+async function populateProviderSelect(active) {
+  const resp = await send({ type: 'GET_PROVIDERS' });
+  const select = $('providerSelect');
+  select.innerHTML = '';
+  const options = (resp.ok && resp.options) || [{ id: 'mal', label: 'MAL' }];
+  for (const opt of options) {
+    const el = document.createElement('option');
+    el.value = opt.id;
+    el.textContent = opt.label;
+    select.appendChild(el);
+  }
+  select.value = active || (resp.ok && resp.active) || 'mal';
+}
+
 async function showSetup(status) {
+  providerId = status.providerId || providerId;
+  providerLabel = status.providerLabel || providerLabel;
+  await populateProviderSelect(providerId);
   $('redirectUri').textContent = status.redirectUri || '—';
   $('clientId').value = status.clientId || '';
   $('clientSecret').value = status.clientSecret || '';
+  $('clientSecretField').classList.toggle('hidden', status.needsClientSecret === false);
+  applyProviderLabels();
   showCard('setupCard');
 }
 
@@ -173,12 +217,13 @@ async function showEpisode() {
   }
 
   const m = await send({ type: 'GET_MAPPING', mapKey: currentEpisode.mapKey });
-  if (m.ok && m.mapping?.malAnimeId) {
+  if (m.ok && m.mapping?.animeId) {
     selectTarget({
-      id: m.mapping.malAnimeId,
-      title: m.mapping.malTitle,
-      total: m.mapping.malNumEpisodes || 0,
+      id: m.mapping.animeId,
+      title: m.mapping.title,
+      total: m.mapping.numEpisodes || 0,
       picture: '',
+      url: m.mapping.url,
     });
   } else {
     showPick();
@@ -210,7 +255,7 @@ function renderCandidates(list) {
   const box = $('candidates');
   box.innerHTML = '';
   if (!list || list.length === 0) {
-    box.innerHTML = `<div class="muted">${tr('noSearchResults')}</div>`;
+    box.innerHTML = `<div class="muted">${tr('noSearchResults', { provider: providerLabel })}</div>`;
     return;
   }
   for (const c of list) {
@@ -229,21 +274,27 @@ function renderCandidates(list) {
     btn.className = 'mal';
     btn.textContent = tr('chooseBtn');
     btn.onclick = () =>
-      selectTarget({ id: c.id, title: c.title, total: c.numEpisodes || 0, picture: c.picture });
+      selectTarget({
+        id: c.id,
+        title: c.title,
+        total: c.numEpisodes || 0,
+        picture: c.picture,
+        url: c.url,
+      });
     div.appendChild(btn);
     box.appendChild(div);
   }
 }
 
-// Grava/atualiza o vínculo local CR/PV↔MAL pro episódio/série atual.
+// Grava/atualiza o vínculo local source→provider pro episódio/série atual.
 function saveMapping(target) {
   return send({
     type: 'SAVE_MAPPING',
     mapKey: currentEpisode.mapKey,
     value: {
-      malAnimeId: target.id,
-      malTitle: target.title,
-      malNumEpisodes: target.total || 0,
+      animeId: target.id,
+      title: target.title,
+      numEpisodes: target.total || 0,
       crSeriesTitle: currentEpisode.seriesTitle,
       site: currentEpisode.site,
       savedAt: Date.now(),
@@ -267,7 +318,7 @@ async function selectTarget(target) {
   $('pickArea').classList.add('hidden');
   $('targetArea').classList.remove('hidden');
   $('regressWarn').classList.add('hidden');
-  $('saveBtn').textContent = tr('saveBtnLabel');
+  $('saveBtn').textContent = tr('saveBtnLabel', { provider: providerLabel });
   $('targetTitle').textContent = target.title;
   const img = $('targetImg');
   if (target.picture) {
@@ -278,7 +329,7 @@ async function selectTarget(target) {
     img.classList.add('hidden');
   }
   $('epNum').value = String(currentEpisode.episodeNumber ?? '');
-  $('targetProgress').textContent = tr('readingProgress');
+  $('targetProgress').textContent = tr('readingProgress', { provider: providerLabel });
 
   const ls = await send({ type: 'GET_LIST_STATUS', animeId: target.id });
   if (ls.ok) {
@@ -301,17 +352,17 @@ function updateRegressWarn() {
   const cur = currentTarget?.currentWatched;
   const w = $('regressWarn');
   if (Number.isFinite(num) && cur != null && num < cur) {
-    w.textContent = tr('regressWarning', { cur, num });
+    w.textContent = tr('regressWarning', { cur, num, provider: providerLabel });
     w.classList.remove('hidden');
     if (!forceWrite) $('saveBtn').textContent = tr('saveBtnForce');
   } else {
     w.classList.add('hidden');
-    if (!forceWrite) $('saveBtn').textContent = tr('saveBtnLabel');
+    if (!forceWrite) $('saveBtn').textContent = tr('saveBtnLabel', { provider: providerLabel });
   }
 }
 
 // Datas automáticas (só preenche se estiver vazio; nunca sobrescreve):
-// - início = hoje quando o MAL está em 0 e você grava um nº > 0 (robusto à numeração do CR)
+// - início = hoje quando o provider está em 0 e você grava um nº > 0 (robusto à numeração da source)
 // - fim = hoje quando completa a temporada (nº >= total) ou ao finalizar explicitamente
 function computeDates(num, completed) {
   const dates = {};
@@ -325,7 +376,7 @@ function computeDates(num, completed) {
   return dates;
 }
 
-// Grava no MAL (usado por "Gravar" e "Finalizar"). completed força status completed.
+// Grava no provider ativo (usado por "Gravar" e "Finalizar"). completed força status completed.
 async function writeToMal(num, completed) {
   const dates = computeDates(num, completed);
   setMsg(completed ? tr('finishingMsg') : tr('savingMsg'));
@@ -394,8 +445,8 @@ async function onComplete() {
 }
 
 // "Plan to watch": grava o vínculo local sem gravar episódio. Se o anime ainda
-// não está em nenhuma lista do MAL, também marca status "plan_to_watch" lá
-// (0 episódios) — se já está (watching, completed, etc.), não mexe no status.
+// não está em nenhuma lista do provider, também marca status "plan to watch"
+// lá (0 episódios) — se já está (watching, completed, etc.), não mexe no status.
 async function onPlanToWatch() {
   if (!currentTarget.inList) {
     setMsg(tr('savingMsg'));
@@ -431,11 +482,6 @@ function siteUrl(key, val) {
   return id ? `https://www.crunchyroll.com/series/${id}` : null;
 }
 
-function openSite(url) {
-  if (!url) return;
-  chrome.tabs.create({ url });
-}
-
 async function openMappings() {
   const resp = await send({ type: 'GET_ALL_MAPPINGS' });
   const list = $('mappingsList');
@@ -450,8 +496,8 @@ async function openMappings() {
     row.className = 'maprow';
     row.innerHTML = `
       <div class="info">
-        <div class="v">${escapeHtml(val.malTitle || '?')}</div>
-        <div class="k">${escapeHtml(key)}${val.malNumEpisodes ? ' · ' + val.malNumEpisodes + ' ep' : ''}</div>
+        <div class="v">${escapeHtml(val.title || '?')}</div>
+        <div class="k">${escapeHtml(key)}${val.numEpisodes ? ' · ' + val.numEpisodes + ' ep' : ''}</div>
       </div>`;
     const actions = document.createElement('div');
     actions.className = 'actions';
@@ -460,11 +506,11 @@ async function openMappings() {
     openSrc.className = `src ${site}`;
     openSrc.textContent = `${SITE_LABEL[site]} ↗`;
     openSrc.disabled = !url;
-    openSrc.onclick = () => openSite(url);
+    openSrc.onclick = () => openUrl(url);
     const open = document.createElement('button');
     open.className = 'mal';
-    open.textContent = 'MAL ↗';
-    open.onclick = () => openMal(val.malAnimeId);
+    open.textContent = `${providerLabel} ↗`;
+    open.onclick = () => openUrl(val.url);
     const remap = document.createElement('button');
     remap.className = 'ghost';
     remap.textContent = tr('remapBtn');
@@ -490,7 +536,7 @@ async function openMappings() {
 function startRemap(mapKey, val) {
   currentEpisode = {
     mapKey,
-    seriesTitle: val.crSeriesTitle || val.malTitle || '',
+    seriesTitle: val.crSeriesTitle || val.title || '',
     site: siteOf(mapKey, val),
   };
   remapOnly = true;
@@ -509,15 +555,29 @@ async function render() {
     setMsg(s.error || tr('errCouldNotGetStatus'), 'err');
     return;
   }
+  providerId = s.providerId || providerId;
+  providerLabel = s.providerLabel || providerLabel;
   $('statusDot').classList.toggle('on', !!s.loggedIn);
   if (!s.clientId || !s.loggedIn) {
     await showSetup(s);
     return;
   }
+  applyProviderLabels();
   await showEpisode();
 }
 
 // ---------- listeners ----------
+
+$('providerSelect').onchange = async () => {
+  await send({ type: 'SET_ACTIVE_PROVIDER', providerId: $('providerSelect').value });
+  const s = await send({ type: 'GET_STATUS' });
+  await showSetup(s);
+};
+
+$('openSettings').onclick = async () => {
+  const s = await send({ type: 'GET_STATUS' });
+  await showSetup(s);
+};
 
 $('saveCreds').onclick = async () => {
   const r1 = await send({ type: 'SET_CLIENT_ID', clientId: $('clientId').value });
@@ -527,7 +587,7 @@ $('saveCreds').onclick = async () => {
 };
 
 $('loginBtn').onclick = async () => {
-  setMsg(tr('openingLogin'));
+  setMsg(tr('openingLogin', { provider: providerLabel }));
   const resp = await send({ type: 'LOGIN' });
   if (resp.ok) {
     setMsg(tr('authenticated'), 'ok');
@@ -543,9 +603,9 @@ $('searchQuery').addEventListener('keydown', (e) => {
 });
 
 $('useUrlBtn').onclick = async () => {
-  const id = parseMalId($('malUrl').value);
+  const id = parseAnimeId($('malUrl').value);
   if (!id) {
-    setMsg(tr('errInvalidMalUrl'), 'err');
+    setMsg(tr('errInvalidMalUrl', { provider: providerLabel }), 'err');
     return;
   }
   setMsg(tr('searchingAnime'));
@@ -557,6 +617,7 @@ $('useUrlBtn').onclick = async () => {
       title: resp.anime.title,
       total: resp.anime.numEpisodes || 0,
       picture: resp.anime.picture,
+      url: resp.anime.url,
     });
   } else {
     setMsg(resp.error || tr('errAnimeNotFound'), 'err');
@@ -570,7 +631,7 @@ $('epNum').addEventListener('input', () => {
 $('saveBtn').onclick = onSave;
 $('completeBtn').onclick = onComplete;
 $('planToWatchBtn').onclick = onPlanToWatch;
-$('openMal').onclick = () => openMal(currentTarget?.id);
+$('openMal').onclick = () => openUrl(currentTarget?.url);
 $('remapLink').onclick = () => {
   remapOnly = false;
   showPick();

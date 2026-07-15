@@ -1,4 +1,4 @@
-// content-pv.js — roda em *.primevideo.com
+// sources/primevideo.js — roda em *.primevideo.com
 // Extrai dados do episódio atual do overlay do player (aberto sobre /detail/...), ou
 // da própria página /detail/... sem o player aberto (ver docs/pv-extraction.md).
 // Fonte com player: elementos .atvwebplayersdk-* injetados pelo SDK da Amazon.
@@ -77,7 +77,7 @@
     return fromPlayerOverlay() || fromDetailPage();
   }
 
-  // Espera o player montar o overlay (poll curto) — mesmo padrão do content.js do CR.
+  // Espera o player montar o overlay (poll curto) — mesmo padrão do sources/crunchyroll.js.
   function extractWithWait(timeoutMs = 8000) {
     return new Promise((resolve) => {
       const start = Date.now();

@@ -5,6 +5,42 @@ All notable changes to this project are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 and the project adopts [Semantic Versioning](https://semver.org/).
 
+## [0.5.0] — 2026-07-14
+
+### Added
+
+- **Provider layer: AniList support alongside MyAnimeList.** Where progress gets tracked
+  is now a choice, not a hardcoded backend — pick MAL, AniList, or switch between them
+  anytime from the new **⚙** settings button in the header. AniList login uses OAuth2's
+  Implicit Grant (no client secret needed; neither AniList grant type supports refresh
+  tokens, so a year-long token with no exchange step is the simpler option). Search,
+  progress, and "Plan to watch" all go through AniList's GraphQL API when it's the active
+  provider.
+- **Cross-provider mapping resolution.** A season already mapped on one provider resolves
+  automatically on the other via AniList's `idMal` field (works both ways, MAL→AniList and
+  AniList→MAL) instead of asking you to search again — the AniList API is the only side
+  that holds both IDs on the same record.
+- Saved mappings now keep a target **per provider** (`providers: { mal: {...}, anilist:
+  {...} }`) instead of one baked into the field names, so switching your active provider
+  never discards a mapping you already had with the other one. Existing mappings migrate
+  to the new shape automatically the first time they're read.
+
+### Changed
+
+- `mal.js` becomes `providers/mal.js`, implementing the same provider interface AniList
+  now uses (`providers/anilist.js`) — internal refactor, no behavior change on its own.
+- `content.js` / `content-pv.js` become `sources/crunchyroll.js` / `sources/primevideo.js`
+  — symmetric with `providers/`, same rename spirit (no behavior change).
+- UI strings that referenced "MAL" specifically (button labels, placeholders, error/status
+  messages) now adapt to whichever provider is active.
+- `host_permissions` gains `graphql.anilist.co`.
+
+Motivation: Prime Video translates anime titles heavily in its own UI, which made MAL's
+plain-title search miss often. Rather than replace the working MAL integration, the
+backend became swappable — AniList's multilingual `synonyms` field handles those localized
+titles noticeably better, confirmed against a real Prime Video page after this shipped. See
+`docs/contexto-providers.md` for the full design notes.
+
 ## [0.4.2] — 2026-07-13
 
 ### Fixed

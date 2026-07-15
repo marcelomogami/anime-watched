@@ -1,4 +1,4 @@
-// content.js — roda em *.crunchyroll.com
+// sources/crunchyroll.js — roda em *.crunchyroll.com
 // Extrai dados do episódio atual da página /watch/, ou da série+temporada na página
 // /series/{id}/... (sem episódio aberto — ver docs/cr-extraction.md). Responde ao
 // background. Fonte primária pro /watch/: JSON-LD TVEpisode. Fallback: og:title.

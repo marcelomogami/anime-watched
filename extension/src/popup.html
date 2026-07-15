@@ -10,7 +10,7 @@
         --fg: #e8e8ea;
         --muted: #9a9aa2;
         --accent: #f47521; /* laranja Crunchyroll */
-        --accent2: #2e51a2; /* azul MAL */
+        --accent2: #2e51a2; /* azul do provider (MAL/AniList) */
         --pv: #1399ff; /* azul Prime Video */
         --card: #26262b;
         --field: #16161a;
@@ -38,7 +38,7 @@
       .dot.on { background: var(--ok); }
       .card { background: var(--card); border-radius: 8px; padding: 10px; margin-bottom: 10px; }
       label { display: block; color: var(--muted); font-size: 11px; margin-bottom: 4px; }
-      input[type="text"] {
+      input[type="text"], select {
         width: 100%;
         padding: 6px 8px;
         border-radius: 6px;
@@ -103,22 +103,37 @@
     </style>
   </head>
   <body>
-    <h1><span id="statusDot" class="dot"></span> Anime Watched</h1>
+    <h1>
+      <span id="statusDot" class="dot"></span> Anime Watched
+      <span class="grow"></span>
+      <button
+        class="ghost"
+        id="openSettings"
+        style="padding: 3px 7px; font-size: 12px"
+        data-i18n-title="settingsBtnTitle"
+      >
+        ⚙
+      </button>
+    </h1>
 
     <!-- [1] SETUP -->
     <div class="card hidden" id="setupCard">
-      <label data-i18n-html="setupRedirectLabel"></label>
+      <label data-i18n="setupProviderLabel"></label>
+      <select id="providerSelect" class="wide"></select>
+      <label style="margin-top: 8px" id="redirectLabel"></label>
       <div class="mono" id="redirectUri">—</div>
-      <label style="margin-top: 8px" data-i18n="setupClientIdLabel"></label>
+      <label style="margin-top: 8px" id="clientIdLabel_"></label>
       <input id="clientId" type="text" data-i18n-placeholder="setupClientIdPlaceholder" />
-      <label style="margin-top: 8px"
-        ><span data-i18n="setupClientSecretLabel"></span>
-        <span class="muted" data-i18n="setupClientSecretHint"></span
-      ></label>
-      <input id="clientSecret" type="text" data-i18n-placeholder="setupClientSecretPlaceholder" />
+      <div id="clientSecretField">
+        <label style="margin-top: 8px"
+          ><span data-i18n="setupClientSecretLabel"></span>
+          <span class="muted" data-i18n="setupClientSecretHint"></span
+        ></label>
+        <input id="clientSecret" type="text" data-i18n-placeholder="setupClientSecretPlaceholder" />
+      </div>
       <div class="row">
         <button class="ghost grow" id="saveCreds" data-i18n="setupSaveCredsBtn"></button>
-        <button class="mal grow" id="loginBtn" data-i18n="setupLoginBtn"></button>
+        <button class="mal grow" id="loginBtn"></button>
       </div>
     </div>
 
@@ -136,14 +151,14 @@
       <div class="epline" id="epTitle">—</div>
       <div class="epsub" id="epMeta">—</div>
 
-      <!-- [3] Escolher anime no MAL (não mapeado) -->
+      <!-- [3] Escolher anime no provider ativo (não mapeado) -->
       <div class="hidden" id="pickArea">
         <div class="row tight">
-          <input id="searchQuery" class="grow" type="text" data-i18n-placeholder="searchPlaceholder" />
+          <input id="searchQuery" class="grow" type="text" />
           <button class="ghost" id="searchBtn" data-i18n="searchBtn"></button>
         </div>
         <div id="candidates"></div>
-        <label style="margin-top: 10px" data-i18n="pasteUrlLabel"></label>
+        <label style="margin-top: 10px" id="pasteUrlLabel_"></label>
         <div class="row tight">
           <input id="malUrl" class="grow" type="text" data-i18n-placeholder="pasteUrlPlaceholder" />
           <button class="ghost" id="useUrlBtn" data-i18n="useBtn"></button>
@@ -165,12 +180,12 @@
         </div>
         <div class="warn hidden" id="regressWarn"></div>
         <div class="row" style="margin-top: 10px">
-          <button class="primary grow" id="saveBtn" data-i18n="saveBtnLabel"></button>
+          <button class="primary grow" id="saveBtn"></button>
           <button class="done" id="completeBtn" data-i18n="completeBtnLabel" data-i18n-title="completeBtnTitle"></button>
         </div>
         <div class="btnrow">
           <button class="ghost" id="planToWatchBtn" data-i18n="planToWatchBtnLabel"></button>
-          <button class="mal" id="openMal">MAL ↗</button>
+          <button class="mal" id="openMal"></button>
           <button class="ghost" id="remapLink" data-i18n="changeAnimeBtn"></button>
           <button class="ghost" id="showMappings" data-i18n="viewMappingsBtn"></button>
         </div>

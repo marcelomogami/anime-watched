@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Anime Watched",
-  "version": "0.4.2",
+  "version": "0.5.0",
   "default_locale": "en",
   "description": "__MSG_extDescription__",
   "permissions": ["storage", "identity", "scripting", "activeTab"],
@@ -9,7 +9,8 @@
     "*://*.crunchyroll.com/*",
     "*://*.primevideo.com/*",
     "https://api.myanimelist.net/*",
-    "https://myanimelist.net/*"
+    "https://myanimelist.net/*",
+    "https://graphql.anilist.co/*"
   ],
   "background": {
     "service_worker": "src/background.js",
@@ -32,12 +33,12 @@
   "content_scripts": [
     {
       "matches": ["*://*.crunchyroll.com/*"],
-      "js": ["src/content.js"],
+      "js": ["src/sources/crunchyroll.js"],
       "run_at": "document_idle"
     },
     {
       "matches": ["*://*.primevideo.com/*"],
-      "js": ["src/content-pv.js"],
+      "js": ["src/sources/primevideo.js"],
       "run_at": "document_idle"
     }
   ]
