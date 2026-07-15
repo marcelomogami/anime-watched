@@ -146,6 +146,7 @@ const MEDIA_FIELDS = `
   format
   seasonYear
   coverImage { medium large }
+  bannerImage
 `;
 
 function nodeToCandidate(node) {
@@ -157,6 +158,7 @@ function nodeToCandidate(node) {
     mediaType: node.format || '',
     year: node.seasonYear || '',
     picture: node.coverImage?.large || node.coverImage?.medium || '',
+    banner: node.bannerImage || '',
   };
 }
 

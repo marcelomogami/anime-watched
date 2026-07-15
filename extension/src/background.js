@@ -55,6 +55,8 @@ function flattenSlice(provider, entry, slice) {
     animeId: slice.animeId,
     title: slice.title,
     numEpisodes: slice.numEpisodes || 0,
+    picture: slice.picture || '',
+    banner: slice.banner || '',
     url: provider.getDisplayUrl(slice.animeId),
     crSeriesTitle: entry.crSeriesTitle,
     site: entry.site,
@@ -75,7 +77,13 @@ async function resolveSlice(mapKey, entry, provider) {
     for (const [otherId, otherSlice] of Object.entries(entry.providers || {})) {
       const found = await provider.findByCrossRef(otherId, otherSlice.animeId);
       if (found) {
-        const resolved = { animeId: found.id, title: found.title, numEpisodes: found.numEpisodes || 0 };
+        const resolved = {
+          animeId: found.id,
+          title: found.title,
+          numEpisodes: found.numEpisodes || 0,
+          picture: found.picture || '',
+          banner: found.banner || '',
+        };
         await store.setMappingProvider(mapKey, provider.id, resolved);
         return resolved;
       }
@@ -184,11 +192,17 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
           break;
 
         case 'SAVE_MAPPING': {
-          const { animeId, title, numEpisodes, ...common } = msg.value;
+          const { animeId, title, numEpisodes, picture, banner, ...common } = msg.value;
           await store.setMappingProvider(
             msg.mapKey,
             provider.id,
-            { animeId, title, numEpisodes: numEpisodes || 0 },
+            {
+              animeId,
+              title,
+              numEpisodes: numEpisodes || 0,
+              picture: picture || '',
+              banner: banner || '',
+            },
             common,
           );
           sendResponse({ ok: true });

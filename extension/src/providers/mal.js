@@ -195,6 +195,7 @@ function nodeToCandidate(node) {
     mediaType: node.media_type || '',
     year: node.start_season?.year || '',
     picture: node.main_picture?.medium || node.main_picture?.large || '',
+    banner: '', // MAL's public API has no banner/landscape field
   };
 }
 

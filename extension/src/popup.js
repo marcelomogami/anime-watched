@@ -222,7 +222,8 @@ async function showEpisode() {
       id: m.mapping.animeId,
       title: m.mapping.title,
       total: m.mapping.numEpisodes || 0,
-      picture: '',
+      picture: m.mapping.picture || '',
+      banner: m.mapping.banner || '',
       url: m.mapping.url,
     });
   } else {
@@ -264,8 +265,9 @@ function renderCandidates(list) {
     const sub = [c.en, c.mediaType, c.year, c.numEpisodes ? `${c.numEpisodes} ep` : '']
       .filter(Boolean)
       .join(' · ');
+    const bannerSrc = c.banner || c.picture || '';
     div.innerHTML = `
-      ${c.picture ? `<img src="${escapeHtml(c.picture)}" alt="">` : '<img alt="">'}
+      ${bannerSrc ? `<img class="banner" src="${escapeHtml(bannerSrc)}" alt="">` : '<div class="banner"></div>'}
       <div class="meta">
         <div class="title">${escapeHtml(c.title)}</div>
         <div class="sub">${escapeHtml(sub)}</div>
@@ -279,6 +281,7 @@ function renderCandidates(list) {
         title: c.title,
         total: c.numEpisodes || 0,
         picture: c.picture,
+        banner: c.banner,
         url: c.url,
       });
     div.appendChild(btn);
@@ -295,6 +298,8 @@ function saveMapping(target) {
       animeId: target.id,
       title: target.title,
       numEpisodes: target.total || 0,
+      picture: target.picture || '',
+      banner: target.banner || '',
       crSeriesTitle: currentEpisode.seriesTitle,
       site: currentEpisode.site,
       savedAt: Date.now(),
@@ -321,12 +326,11 @@ async function selectTarget(target) {
   $('saveBtn').textContent = tr('saveBtnLabel', { provider: providerLabel });
   $('targetTitle').textContent = target.title;
   const img = $('targetImg');
-  if (target.picture) {
-    img.src = target.picture;
-    img.classList.remove('hidden');
+  const bannerSrc = target.banner || target.picture || '';
+  if (bannerSrc) {
+    img.src = bannerSrc;
   } else {
     img.removeAttribute('src');
-    img.classList.add('hidden');
   }
   $('epNum').value = String(currentEpisode.episodeNumber ?? '');
   $('targetProgress').textContent = tr('readingProgress', { provider: providerLabel });
@@ -493,11 +497,16 @@ async function openMappings() {
   for (const [key, val] of entries) {
     const site = siteOf(key, val);
     const row = document.createElement('div');
-    row.className = 'maprow';
+    row.className = 'mapcard';
+    const bannerSrc = val.banner || val.picture || '';
     row.innerHTML = `
+      ${bannerSrc ? `<img class="banner" src="${escapeHtml(bannerSrc)}" alt="">` : '<div class="banner"></div>'}
       <div class="info">
         <div class="v">${escapeHtml(val.title || '?')}</div>
-        <div class="k">${escapeHtml(key)}${val.numEpisodes ? ' · ' + val.numEpisodes + ' ep' : ''}</div>
+        <div class="subline">
+          <div class="k">${escapeHtml(key)}</div>
+          <div class="ep">${val.numEpisodes ? val.numEpisodes + ' ep' : ''}</div>
+        </div>
       </div>`;
     const actions = document.createElement('div');
     actions.className = 'actions';
@@ -617,6 +626,7 @@ $('useUrlBtn').onclick = async () => {
       title: resp.anime.title,
       total: resp.anime.numEpisodes || 0,
       picture: resp.anime.picture,
+      banner: resp.anime.banner,
       url: resp.anime.url,
     });
   } else {

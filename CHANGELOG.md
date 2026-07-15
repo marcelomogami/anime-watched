@@ -5,6 +5,20 @@ All notable changes to this project are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 and the project adopts [Semantic Versioning](https://semver.org/).
 
+## [0.5.1] — 2026-07-14
+
+### Added
+
+- **Banner-style cards across the popup:** saved mappings, search/pick results, and the
+  confirm/save screen all now show a wide cover image (3:1 crop) instead of a small
+  thumbnail or plain text — AniList's `bannerImage` field when available, falling back to
+  the vertical poster (`picture`, cropped) otherwise; MAL entries always use the poster
+  fallback since MAL's API has no landscape image field. Both `picture` and `banner` are
+  persisted per mapping (`providers.<id>.{picture,banner}`, just URLs — a few dozen bytes
+  each, no meaningful cost against `chrome.storage.sync`'s quota) instead of being fetched
+  only transiently like before. Mappings saved before this version show a placeholder
+  until re-saved or re-mapped once.
+
 ## [0.5.0] — 2026-07-14
 
 ### Added
