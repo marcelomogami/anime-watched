@@ -5,6 +5,23 @@ All notable changes to this project are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 and the project adopts [Semantic Versioning](https://semver.org/).
 
+## [0.5.3] — 2026-07-16
+
+### Added
+
+- **MIT license.** The repo had been public since v0.1.0 with no license file, which by
+  default means "all rights reserved" — nobody could legally reuse the code. Now
+  explicitly MIT, mentioned in both READMEs.
+
+### Fixed
+
+- **Release links in this changelog were broken.** They pointed to
+  `/releases/tag/vX.Y.Z` for 0.1.0–0.3.3, but only the v0.1.0 and v0.1.1 tags had ever
+  been created — every other link 404'd. All 15 missing tags (0.2.0 → 0.5.2) were created
+  retroactively, each pointing at the commit that bumped `manifest.json` to that version
+  (matching the convention the two existing tags already followed), and the link list now
+  covers all 17 versions instead of stopping at 0.3.3.
+
 ## [0.5.2] — 2026-07-15
 
 ### Changed
@@ -279,6 +296,16 @@ Crunchyroll to MyAnimeList via the toolbar button.
 - No automatic end-of-episode detection, no score/rewatch, no Chrome Web Store publishing
   (personal use, loaded unpacked).
 
+[0.5.3]: https://github.com/marcelomogami/anime-watched/releases/tag/v0.5.3
+[0.5.2]: https://github.com/marcelomogami/anime-watched/releases/tag/v0.5.2
+[0.5.1]: https://github.com/marcelomogami/anime-watched/releases/tag/v0.5.1
+[0.5.0]: https://github.com/marcelomogami/anime-watched/releases/tag/v0.5.0
+[0.4.2]: https://github.com/marcelomogami/anime-watched/releases/tag/v0.4.2
+[0.4.1]: https://github.com/marcelomogami/anime-watched/releases/tag/v0.4.1
+[0.4.0]: https://github.com/marcelomogami/anime-watched/releases/tag/v0.4.0
+[0.3.6]: https://github.com/marcelomogami/anime-watched/releases/tag/v0.3.6
+[0.3.5]: https://github.com/marcelomogami/anime-watched/releases/tag/v0.3.5
+[0.3.4]: https://github.com/marcelomogami/anime-watched/releases/tag/v0.3.4
 [0.3.3]: https://github.com/marcelomogami/anime-watched/releases/tag/v0.3.3
 [0.3.2]: https://github.com/marcelomogami/anime-watched/releases/tag/v0.3.2
 [0.3.1]: https://github.com/marcelomogami/anime-watched/releases/tag/v0.3.1

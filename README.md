@@ -210,3 +210,7 @@ docs/
 Crunchyroll and Prime Video as sources (for Jellyfin, the `jellyfin-ani-sync` plugin
 already covers it); MAL and AniList as providers. No automatic end-of-episode detection,
 no score/rewatch, no Chrome Web Store publishing — personal use, loaded unpacked.
+
+## License
+
+[MIT](LICENSE) — built for personal use, but feel free to use, fork, or borrow from it.
