@@ -7,3 +7,8 @@ Thumbs.db
 
 # Node (caso surja tooling no futuro)
 node_modules/
+
+# Contexto local do Claude Code (não faz parte do repo público)
+/AGENTS.md
+/CLAUDE.md
+/.playwright-mcp/
