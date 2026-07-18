@@ -12,3 +12,6 @@ node_modules/
 /AGENTS.md
 /CLAUDE.md
 /.playwright-mcp/
+
+# Notas de design internas (pt-BR) — local por padrão, ver personal/docs/new-project.md
+/docs/

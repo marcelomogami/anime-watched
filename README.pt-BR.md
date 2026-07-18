@@ -15,7 +15,7 @@ Interface disponível em **pt-BR** e **en** (o Chrome escolhe pelo idioma do nav
 
 | Episódio detectado → gravar | Buscar/escolher no provider | Gestão de mapeamentos |
 |---|---|---|
-| ![Popup com episódio detectado e anime já mapeado](docs/screenshots/popup-main.png) | ![Popup com resultados de busca](docs/screenshots/popup-search.png) | ![Tela de gestão de mapeamentos salvos](docs/screenshots/popup-mappings.png) |
+| ![Popup com episódio detectado e anime já mapeado](screenshots/popup-main.png) | ![Popup com resultados de busca](screenshots/popup-search.png) | ![Tela de gestão de mapeamentos salvos](screenshots/popup-mappings.png) |
 
 ## Como funciona
 
@@ -27,11 +27,11 @@ AniList, escolhido por você — é onde o progresso de fato fica registrado.
    - **Crunchyroll:** numa página de episódio (`/watch/...`), lê do JSON-LD da página qual
      é a série, a temporada e o número do episódio. Na página da série (`/series/{id}/...`)
      — sem episódio aberto — lê o ID da série na URL e a temporada direto do seletor de
-     temporada da própria página (`docs/cr-extraction.md`).
+     temporada da própria página.
    - **Prime Video:** com o player aberto, lê a série/temporada/episódio direto do overlay
      do player. Na página de detalhe (`/detail/{id}`) — sem o player aberto — lê a
      temporada e o título dos metadados da página; o próprio ID de detalhe já é
-     por-temporada (`docs/pv-extraction.md`).
+     por-temporada.
 2. **Configurar o provider:** escolha MAL ou AniList na tela de configuração — um fica
    ativo por vez, trocável a qualquer momento pelo botão **⚙** no cabeçalho. Cada um mantém
    o próprio login.
@@ -195,12 +195,7 @@ extension/
     store.js       # wrapper de chrome.storage (config, tokens, mapa de mapeamentos — namespaced por provider)
     popup.html/js  # a interface (máquina de estados), com strings via chrome.i18n
   icons/
-docs/
-  contexto.md                        # contexto e plano de implementação
-  contexto-mapeamento-sem-gravar.md  # plano da feature "Para assistir"
-  contexto-providers.md              # plano da camada de providers / suporte a AniList
-  cr-extraction.md                   # investigação das páginas de episódio/série do Crunchyroll (fonte da extração)
-  pv-extraction.md                   # investigação do player/página de detalhe do Prime Video (fonte da extração)
+docs/            # notas de design internas (pt-BR), uma pasta por versão major
 ```
 
 ## Escopo atual

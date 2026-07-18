@@ -16,7 +16,7 @@ language).
 
 | Episode detected → save | Search/pick on the provider | Manage mappings |
 |---|---|---|
-| ![Popup with a detected episode and an already-mapped anime](docs/screenshots/popup-main-en.png) | ![Popup with search results](docs/screenshots/popup-search-en.png) | ![Saved mappings management screen](docs/screenshots/popup-mappings-en.png) |
+| ![Popup with a detected episode and an already-mapped anime](screenshots/popup-main-en.png) | ![Popup with search results](screenshots/popup-search-en.png) | ![Saved mappings management screen](screenshots/popup-mappings-en.png) |
 
 ## How it works
 
@@ -28,11 +28,11 @@ picked by you — wherever progress actually gets tracked.
    - **Crunchyroll:** on an episode page (`/watch/...`), reads series, season, and
      episode number from the page's JSON-LD. On the series page (`/series/{id}/...`) —
      no episode open — reads the series ID from the URL and the season from the page's
-     own season selector (`docs/cr-extraction.md`).
+     own season selector.
    - **Prime Video:** with the player open, reads series/season/episode straight from
      the player's DOM overlay. On the detail page (`/detail/{id}`) — no player open —
      reads season and title from the page's metadata; the detail ID itself is already
-     season-specific (`docs/pv-extraction.md`).
+     season-specific.
 2. **Provider setup:** pick MAL or AniList in the setup screen — one active at a time,
    switchable anytime from the **⚙** button in the header. Each keeps its own login.
 3. Click the extension icon → the popup shows what it detected.
@@ -197,12 +197,7 @@ extension/
     store.js       # chrome.storage wrapper (config, tokens, mapping table — namespaced per provider)
     popup.html/js  # the interface (state machine), strings via chrome.i18n
   icons/
-docs/
-  contexto.md                        # context and implementation plan (pt-BR)
-  contexto-mapeamento-sem-gravar.md  # design notes for "Plan to watch" (pt-BR)
-  contexto-providers.md              # design notes for the provider layer / AniList support (pt-BR)
-  cr-extraction.md                   # investigation of Crunchyroll's episode/series pages (extraction source)
-  pv-extraction.md                   # investigation of the Prime Video player/detail page (extraction source)
+docs/            # internal design notes (pt-BR), one folder per major version
 ```
 
 ## Current scope
