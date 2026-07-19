@@ -43,11 +43,12 @@ papel.
      do player. Na página de detalhe (`/detail/{id}`) — sem o player aberto — lê a
      temporada e o título dos metadados da página; o próprio ID de detalhe já é
      por-temporada.
-2. **Casamento com suas listas:** a extensão mantém um cache local de toda a sua coleção do
-   AniList (Watching/Plan to Watch/etc. — `MediaListCollection`, atualizado sozinho a cada
-   ~1 semana ou sob demanda). O que é detectado na página é comparado contra esse cache —
-   principalmente pelo link de streaming que o AniList tem cadastrado pro anime
-   (`externalLinks`), com um fallback por título quando esse link está ausente ou
+2. **Casamento com suas listas:** a extensão mantém um cache local de todas as suas listas
+   do AniList (Assistindo, Para assistir, Completo, Dropado, Pausado, Reassistindo, etc.) —
+   `MediaListCollection`, atualizado sozinho a cada ~1 semana ou sob demanda. O que é
+   detectado na página é comparado contra esse cache — principalmente pelo link de
+   streaming que o AniList tem cadastrado pro anime (`externalLinks`), com um fallback por
+   título quando esse link está ausente ou
    desatualizado (ver [Limitações conhecidas](#limitações-conhecidas)).
 3. Ao clicar no ícone da extensão, dependendo da página e se achou ou não uma
    correspondência, uma de quatro telas aparece:

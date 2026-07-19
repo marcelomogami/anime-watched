@@ -41,11 +41,11 @@ and writes your **real AniList lists** — there's no local mapping table standi
      reads season and title from the page's metadata; the detail ID itself is already
      season-specific.
 2. **Matching against your lists:** the extension keeps a local cache of your whole AniList
-   Watching/Plan to Watch/etc. collection (`MediaListCollection`, refreshed automatically
-   about once a week or on demand). What's detected on the page is matched against that
-   cache — primarily by the streaming link AniList has on file for that anime
-   (`externalLinks`), falling back to matching by title when that link is missing or
-   outdated (see [Known limitations](#known-limitations)).
+   lists (Watching, Plan to Watch, Completed, Dropped, Paused, Rewatching, etc.) —
+   `MediaListCollection`, refreshed automatically about once a week or on demand. What's
+   detected on the page is matched against that cache — primarily by the streaming link
+   AniList has on file for that anime (`externalLinks`), falling back to matching by title
+   when that link is missing or outdated (see [Known limitations](#known-limitations)).
 3. Click the extension icon → depending on the page and whether a match was found, one of
    four screens shows up:
    - **No match found:** search AniList directly (by title, or paste a URL/ID) and pick the
