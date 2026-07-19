@@ -163,6 +163,14 @@ function formatRelativeTime(fetchedAt) {
 
 const SITE_LABEL = { cr: 'CR', pv: 'PV' };
 
+// Total desconhecido (simulcast/anúncio recente) não vira barra vazia mais —
+// usa a média de um cour (13 episódios) só como referência visual, pra dar
+// alguma noção de andamento quando já tem progresso gravado. Nunca aparece
+// como número real em lugar nenhum (contador continua mostrando "?"), é só
+// a base do cálculo da barra — que também ganha a classe `estimated` (cor
+// diferente, amarela) pra não parecer progresso real/confirmado.
+const ESTIMATED_COUR_EPISODES = 13;
+
 // Badge de source: só CR ou PV (as duas sources que a extensão de fato
 // suporta) — outros STREAMING do externalLinks (Netflix, YouTube, etc.) são
 // ignorados aqui, mesmo que venham antes na lista; mostrar um link pra uma
@@ -200,7 +208,7 @@ function renderPanelCard(entry) {
       <div class="subline">
         <div class="k">${media.episodes ? tr('panelProgress', { progress: entry.progress, total: media.episodes }) : tr('panelProgressNoTotal', { progress: entry.progress })}</div>
       </div>
-      <div class="progressbar"><div class="fill" style="width: ${media.episodes ? Math.min(100, (entry.progress / media.episodes) * 100) : 0}%"></div></div>
+      <div class="progressbar"><div class="fill${media.episodes ? '' : ' estimated'}" style="width: ${Math.min(100, (entry.progress / (media.episodes || ESTIMATED_COUR_EPISODES)) * 100)}%"></div></div>
       ${availabilityHtml}
     </div>`;
   const actions = document.createElement('div');
@@ -313,7 +321,7 @@ function showDetail(entry, opts = {}) {
   else img.removeAttribute('src');
   $('detailTitle').textContent = title;
   $('detailProgress').value = String(entry.progress ?? 0);
-  $('detailTotal').textContent = media.episodes ? tr('epOfTotal', { total: media.episodes }) : '';
+  $('detailTotal').textContent = tr('epOfTotal', { total: media.episodes || '??' });
 
   const statusLabel = STATUS_LABEL_KEY[entry.status];
   $('detailStatus').classList.toggle('hidden', !statusLabel);
@@ -464,7 +472,7 @@ function showQuick(entry, source) {
     episode: source.episodeNumber,
   });
   $('quickEpNum').value = String(source.episodeNumber ?? '');
-  $('quickTotal').textContent = media.episodes ? tr('epOfTotal', { total: media.episodes }) : '';
+  $('quickTotal').textContent = tr('epOfTotal', { total: media.episodes || '??' });
 
   const statusLabel = STATUS_LABEL_KEY[entry.status];
   $('quickStatus').classList.toggle('hidden', !statusLabel);

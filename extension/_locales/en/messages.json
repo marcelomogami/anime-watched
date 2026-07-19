@@ -108,7 +108,7 @@
     "message": "{progress}/{total} ep"
   },
   "panelProgressNoTotal": {
-    "message": "{progress} ep"
+    "message": "{progress}/?? ep"
   },
   "panelNextEpisodeIn": {
     "message": "next episode in {time}"

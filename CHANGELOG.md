@@ -5,6 +5,20 @@ All notable changes to this project are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 and the project adopts [Semantic Versioning](https://semver.org/).
 
+## [1.0.3] — 2026-07-19
+
+### Added
+
+- **Estimated progress bar for anime with an unknown episode total** (e.g. a recently
+  announced simulcast). The bar used to just render empty (0%) whenever `episodes` wasn't
+  known yet, even with real progress recorded — looked like you hadn't started. Now uses
+  13 (the average length of a 1-cour anime) as a visual-only denominator, and renders in
+  yellow instead of green to signal it's an estimate, not a real total. The counter next to
+  it shows `{progress}/?? ep` instead of just `{progress} ep`, and the detail/quick screens'
+  `/ ??` placeholder replaces the previously blank total. None of this is stored or sent
+  anywhere — purely a rendering choice, gone the moment AniList reports the real total
+  (patched instantly on save, or on the next re-sync).
+
 ## [1.0.2] — 2026-07-19
 
 ### Added
@@ -390,6 +404,7 @@ Crunchyroll to MyAnimeList via the toolbar button.
 - No automatic end-of-episode detection, no score/rewatch, no Chrome Web Store publishing
   (personal use, loaded unpacked).
 
+[1.0.3]: https://github.com/marcelomogami/anime-watched/releases/tag/v1.0.3
 [1.0.2]: https://github.com/marcelomogami/anime-watched/releases/tag/v1.0.2
 [1.0.1]: https://github.com/marcelomogami/anime-watched/releases/tag/v1.0.1
 [1.0.0]: https://github.com/marcelomogami/anime-watched/releases/tag/v1.0.0
