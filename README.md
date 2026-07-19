@@ -53,8 +53,9 @@ and writes your **real AniList lists** — there's no local mapping table standi
      episodes — that page never has an episode number to record); picking it from an episode
      page saves it straight as **Watching**, with that episode's progress.
    - **No relevant page open:** the **list panel** — tabs for Watching / Plan to Watch, each
-     card showing progress, a countdown to the next episode when it's still airing, and a
-     source badge that links straight to Crunchyroll/Prime Video.
+     card showing progress, a countdown to the next episode when it's still airing (or a
+     **"new episode available to watch"** note instead, if you're behind on one that
+     already aired), and a source badge that links straight to Crunchyroll/Prime Video.
    - **Anime/series page, already in a list:** the **detail screen** — progress (editable),
      Save, Plan to Watch, Pause, Drop, links to AniList and to the source platform.
    - **Episode page, anime already recognized:** the **quick screen** — the detected episode

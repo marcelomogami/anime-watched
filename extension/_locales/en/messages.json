@@ -113,6 +113,9 @@
   "panelNextEpisodeIn": {
     "message": "next episode in {time}"
   },
+  "panelNewEpisodeAvailable": {
+    "message": "new episode available to watch"
+  },
   "detailSaveBtn": {
     "message": "Save"
   },

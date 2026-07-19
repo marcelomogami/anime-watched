@@ -59,8 +59,9 @@ papel.
      grava como **Assistindo**, com o progresso daquele episódio.
    - **Nenhuma página relevante aberta:** o **painel de lista** — abas Assistindo / Para
      assistir, cada card mostrando progresso, contagem regressiva pro próximo episódio
-     quando ainda está no ar, e um badge de source que abre direto o Crunchyroll/Prime
-     Video.
+     quando ainda está no ar (ou um aviso de **"novo episódio disponível para assistir"**
+     em vez disso, se você está atrasado num que já saiu), e um badge de source que abre
+     direto o Crunchyroll/Prime Video.
    - **Página do anime/série, já numa lista:** a **tela de detalhes** — progresso
      (editável), Gravar, Para assistir, Pausar, Dropar, links pro AniList e pra plataforma
      de origem.

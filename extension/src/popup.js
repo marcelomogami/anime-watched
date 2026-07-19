@@ -131,6 +131,24 @@ function formatCountdown(seconds) {
   return `${mins}min`;
 }
 
+// Countdown pro próximo episódio só faz sentido se o episódio SEGUINTE ao seu
+// progresso é o que ainda tá pra estrear. Se `nextAiringEpisode.episode` for
+// maior que `progress + 1`, já saiu episódio que você não assistiu ainda —
+// mostra "novo episódio disponível" em vez da contagem regressiva do próximo
+// (achado real: sem isso, ficava mostrando contagem pro episódio N+2 sem
+// avisar que o N+1 já tinha saído). Anime que já terminou de exibir
+// (`nextAiringEpisode` nulo) mas com progresso atrás do total conhecido cai no
+// mesmo caso — hoje não mostrava nada.
+function episodeAvailability(entry, media) {
+  const nextEp = media.nextAiringEpisode;
+  if (nextEp) {
+    if (entry.progress + 1 < nextEp.episode) return { available: true };
+    return { available: false, countdown: formatCountdown(nextEp.timeUntilAiring) };
+  }
+  if (media.episodes && entry.progress < media.episodes) return { available: true };
+  return null;
+}
+
 // Ms desde `fetchedAt` → "Sincronizado há Xh"/"Xd"/"agora mesmo" — pro
 // indicador do botão de re-sync.
 function formatRelativeTime(fetchedAt) {
@@ -167,6 +185,12 @@ function renderPanelCard(entry) {
   const media = entry.media;
   const title = media.title?.romaji || media.title?.english || '?';
   const bannerSrc = media.bannerImage || media.coverImage?.large || media.coverImage?.medium || '';
+  const availability = episodeAvailability(entry, media);
+  const availabilityHtml = !availability
+    ? ''
+    : availability.available
+      ? `<div class="countdown available">${escapeHtml(tr('panelNewEpisodeAvailable'))}</div>`
+      : `<div class="countdown">${escapeHtml(tr('panelNextEpisodeIn', { time: availability.countdown }))}</div>`;
   const row = document.createElement('div');
   row.className = 'mapcard';
   row.innerHTML = `
@@ -177,7 +201,7 @@ function renderPanelCard(entry) {
         <div class="k">${media.episodes ? tr('panelProgress', { progress: entry.progress, total: media.episodes }) : tr('panelProgressNoTotal', { progress: entry.progress })}</div>
       </div>
       <div class="progressbar"><div class="fill" style="width: ${media.episodes ? Math.min(100, (entry.progress / media.episodes) * 100) : 0}%"></div></div>
-      ${media.nextAiringEpisode ? `<div class="countdown">${escapeHtml(tr('panelNextEpisodeIn', { time: formatCountdown(media.nextAiringEpisode.timeUntilAiring) }))}</div>` : ''}
+      ${availabilityHtml}
     </div>`;
   const actions = document.createElement('div');
   actions.className = 'actions';
@@ -296,13 +320,15 @@ function showDetail(entry, opts = {}) {
   if (statusLabel) $('detailStatus').textContent = tr('detailInStatus', { status: tr(statusLabel) });
 
   const countdown = $('detailCountdown');
-  if (media.nextAiringEpisode) {
-    countdown.textContent = tr('panelNextEpisodeIn', {
-      time: formatCountdown(media.nextAiringEpisode.timeUntilAiring),
-    });
-    countdown.classList.remove('hidden');
-  } else {
+  const availability = episodeAvailability(entry, media);
+  countdown.classList.toggle('available', !!availability?.available);
+  if (!availability) {
     countdown.classList.add('hidden');
+  } else {
+    countdown.textContent = availability.available
+      ? tr('panelNewEpisodeAvailable')
+      : tr('panelNextEpisodeIn', { time: availability.countdown });
+    countdown.classList.remove('hidden');
   }
 
   const link = streamingLink(media);

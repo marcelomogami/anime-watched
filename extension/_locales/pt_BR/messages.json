@@ -113,6 +113,9 @@
   "panelNextEpisodeIn": {
     "message": "próximo episódio em {time}"
   },
+  "panelNewEpisodeAvailable": {
+    "message": "novo episódio disponível para assistir"
+  },
   "detailSaveBtn": {
     "message": "Gravar"
   },

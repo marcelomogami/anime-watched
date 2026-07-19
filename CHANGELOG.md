@@ -5,6 +5,20 @@ All notable changes to this project are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 and the project adopts [Semantic Versioning](https://semver.org/).
 
+## [1.0.2] — 2026-07-19
+
+### Added
+
+- **"New episode available to watch" indicator.** The countdown to the next episode
+  (panel cards and detail screen) always showed the time until AniList's
+  `nextAiringEpisode`, even when an earlier episode had already aired and you hadn't
+  watched it yet — confusing (e.g. showing "next episode in 3d" for episode 16 while
+  episode 15, already out, sat unwatched). Now checks whether your progress is actually
+  caught up to what's aired: if not, shows **"new episode available to watch"** (green)
+  instead of the countdown. Also covers anime that finished airing entirely (no
+  `nextAiringEpisode`) but still has unwatched episodes below the known total — previously
+  showed nothing at all in that case.
+
 ## [1.0.1] — 2026-07-19
 
 ### Fixed
@@ -376,6 +390,7 @@ Crunchyroll to MyAnimeList via the toolbar button.
 - No automatic end-of-episode detection, no score/rewatch, no Chrome Web Store publishing
   (personal use, loaded unpacked).
 
+[1.0.2]: https://github.com/marcelomogami/anime-watched/releases/tag/v1.0.2
 [1.0.1]: https://github.com/marcelomogami/anime-watched/releases/tag/v1.0.1
 [1.0.0]: https://github.com/marcelomogami/anime-watched/releases/tag/v1.0.0
 [0.5.3]: https://github.com/marcelomogami/anime-watched/releases/tag/v0.5.3
