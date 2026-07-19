@@ -132,9 +132,15 @@
     return data;
   }
 
-  // Espera o SPA renderizar o JSON-LD/og (poll curto).
+  // Espera o SPA renderizar o JSON-LD/og (poll curto). Só faz sentido pollar em
+  // /watch/ ou /series/ — fora delas a página nunca vai virar uma das duas com
+  // o tempo, então resolve na hora (bug real: popup ficava sem mostrar nada por
+  // até 8s parado no home/busca/browse do CR antes de cair no painel).
   function extractWithWait(timeoutMs = 8000) {
     return new Promise((resolve) => {
+      if (!/\/watch\//.test(location.pathname) && !/\/series\//.test(location.pathname)) {
+        return resolve(null);
+      }
       const start = Date.now();
       const tick = () => {
         const data = extractNow();

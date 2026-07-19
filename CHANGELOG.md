@@ -5,6 +5,19 @@ All notable changes to this project are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 and the project adopts [Semantic Versioning](https://semver.org/).
 
+## [1.0.1] — 2026-07-19
+
+### Fixed
+
+- **Popup showed nothing for up to 8 seconds on Crunchyroll/Prime Video pages that aren't
+  an anime or episode page** (e.g. the homepage, search, or browse). `extractWithWait()` in
+  both `sources/crunchyroll.js` and `sources/primevideo.js` polled the page for up to 8s
+  before giving up and falling back to the list panel — useful while the page's own SPA is
+  still rendering a `/watch/`/`/series/`/`/detail/{id}` page, but pointless on a page that
+  structurally can never match (the URL pattern check itself never changes without a
+  navigation). Both now check the URL up front and resolve immediately when it's clearly
+  not a relevant page, instead of polling it 26 times for nothing.
+
 ## [1.0.0] — 2026-07-18
 
 > **From-scratch, AniList-first rewrite.** MyAnimeList support, manual mapping, and the
@@ -363,6 +376,7 @@ Crunchyroll to MyAnimeList via the toolbar button.
 - No automatic end-of-episode detection, no score/rewatch, no Chrome Web Store publishing
   (personal use, loaded unpacked).
 
+[1.0.1]: https://github.com/marcelomogami/anime-watched/releases/tag/v1.0.1
 [1.0.0]: https://github.com/marcelomogami/anime-watched/releases/tag/v1.0.0
 [0.5.3]: https://github.com/marcelomogami/anime-watched/releases/tag/v0.5.3
 [0.5.2]: https://github.com/marcelomogami/anime-watched/releases/tag/v0.5.2

@@ -78,8 +78,14 @@
   }
 
   // Espera o player montar o overlay (poll curto) — mesmo padrão do sources/crunchyroll.js.
+  // Fora de /detail/{id}, nem o overlay do player nem a página de detalhe têm como
+  // aparecer (o PV sempre abre o player em cima da própria /detail/, nunca numa URL
+  // separada) — resolve na hora em vez de pollar 8s à toa (mesmo bug do CR).
   function extractWithWait(timeoutMs = 8000) {
     return new Promise((resolve) => {
+      if (!parseDetailId(location.href)) {
+        return resolve(null);
+      }
       const start = Date.now();
       const tick = () => {
         const data = extractNow();
