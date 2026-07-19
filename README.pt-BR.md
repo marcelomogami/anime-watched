@@ -6,6 +6,13 @@ Extensão de Chrome (Manifest V3) que grava, com um clique, o episódio que voc�
 ver no **Crunchyroll** ou no **Prime Video** direto na sua lista real do **AniList** — sem
 mapeamento manual, sem backend de tracking separado pra configurar.
 
+> **A v1.0.0 é uma reescrita com quebra de compatibilidade: o suporte ao MyAnimeList sai
+> por completo**, junto com o mapeamento manual e a UI de seleção de provider — o AniList
+> passa a ser o único backend de tracking. Se você precisa de sincronização com o MAL, use
+> a última versão da arquitetura anterior:
+> [v0.5.3](https://github.com/marcelomogami/anime-watched/tree/v0.5.3) (também mantida na
+> branch [`legacy-0.5.3`](https://github.com/marcelomogami/anime-watched/tree/legacy-0.5.3)).
+
 Sem servidor, sem backend: OAuth e as chamadas à API do AniList vivem inteiras dentro da
 extensão (`chrome.storage`). Suas listas Watching/Plan to Watch do AniList *são* o dado — a
 extensão só lê e grava nelas direto.

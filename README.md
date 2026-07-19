@@ -6,6 +6,13 @@ Chrome extension (Manifest V3) that logs, with one click, the episode you just w
 **Crunchyroll** or **Prime Video** to your real **AniList** lists — no manual mapping, no
 separate tracking backend to configure.
 
+> **v1.0.0 is a breaking rewrite: MyAnimeList support is gone**, along with manual mapping
+> and the provider-selection UI — AniList is now the only tracking backend. If you need
+> MAL sync, use the last release of the previous architecture:
+> [v0.5.3](https://github.com/marcelomogami/anime-watched/tree/v0.5.3) (also kept as the
+> [`legacy-0.5.3`](https://github.com/marcelomogami/anime-watched/tree/legacy-0.5.3)
+> branch).
+
 No server, no backend: OAuth and the AniList API calls all live inside the extension
 (`chrome.storage`). Your AniList Watching/Plan to Watch lists *are* the data — the extension
 just reads and writes them directly.
