@@ -145,7 +145,17 @@ function episodeAvailability(entry, media) {
     if (entry.progress + 1 < nextEp.episode) return { available: true };
     return { available: false, countdown: formatCountdown(nextEp.timeUntilAiring) };
   }
-  if (media.episodes && entry.progress < media.episodes) return { available: true };
+  // `nextAiringEpisode` nulo não é garantia de que a série acabou de exibir —
+  // achado real (usuário, 2026-07-19): o AniList devolveu esse campo nulo
+  // temporariamente pra um anime que segue `RELEASING` (confirmado via
+  // consulta pública à API logo em seguida, já com o campo populado de
+  // novo). Só assume "já lançou tudo que você não assistiu" quando o status
+  // do anime é `FINISHED` de verdade — sem essa confirmação, não dá pra
+  // saber se está atrasado ou não, então não mostra nada (mesmo
+  // comportamento de antes da v1.0.2, que só escondia a contagem).
+  if (media.status === 'FINISHED' && media.episodes && entry.progress < media.episodes) {
+    return { available: true };
+  }
   return null;
 }
 

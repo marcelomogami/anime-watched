@@ -5,6 +5,26 @@ All notable changes to this project are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 and the project adopts [Semantic Versioning](https://semver.org/).
 
+## [1.0.4] — 2026-07-19
+
+### Fixed
+
+- **Saving progress could quietly wipe an anime's Crunchyroll/Prime Video link and next-episode
+  data.** `SaveMediaListEntry`'s own nested `media` field in the mutation response came back
+  incomplete (`externalLinks: []`, `nextAiringEpisode: null`) even for entries with confirmed,
+  correct data — confirmed live: after saving, the source badge disappeared from the panel
+  card and the anime stopped being recognized on its Crunchyroll page (fell back to the search
+  screen), while a direct, separate `Media(id: ...)` query for the exact same anime returned
+  everything correctly. `saveEntry()` now does a lean mutation (just id/status/progress/dates)
+  followed by a dedicated `Media` query for the anime's data, instead of trusting whatever the
+  mutation happened to return nested inside it.
+- **"New episode available to watch" (added in 1.0.2) could show up for anime that hadn't
+  actually finished airing.** Root cause of the data loss above also explained this: a
+  temporarily null `nextAiringEpisode` (a real, if uncommon, AniList API gap for currently
+  airing shows) was being treated the same as "this anime finished airing," which isn't a safe
+  assumption. Now only makes that call when the anime's own `status` is confirmed `FINISHED`;
+  otherwise shows nothing, same as before 1.0.2.
+
 ## [1.0.3] — 2026-07-19
 
 ### Added
@@ -404,6 +424,7 @@ Crunchyroll to MyAnimeList via the toolbar button.
 - No automatic end-of-episode detection, no score/rewatch, no Chrome Web Store publishing
   (personal use, loaded unpacked).
 
+[1.0.4]: https://github.com/marcelomogami/anime-watched/releases/tag/v1.0.4
 [1.0.3]: https://github.com/marcelomogami/anime-watched/releases/tag/v1.0.3
 [1.0.2]: https://github.com/marcelomogami/anime-watched/releases/tag/v1.0.2
 [1.0.1]: https://github.com/marcelomogami/anime-watched/releases/tag/v1.0.1

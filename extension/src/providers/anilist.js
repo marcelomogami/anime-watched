@@ -189,11 +189,9 @@ export async function getAnime(animeId) {
 // --- lista completa (cache) — ver docs/1.0.0/design.md ---
 
 // Campos do `Media` usados pra montar cada entrada do cache local — mesmo
-// shape em `getListCache()` e `saveEntry()` (a mutation devolve `media`
-// nesse formato também, confirmado por introspecção: `SaveMediaListEntry`
-// retorna `MediaList`, e `MediaList.media` resolve pro `Media` de verdade —
-// dá pra montar/atualizar o cache com a resposta da própria mutation, sem
-// uma segunda busca).
+// shape em `getListCache()` (dentro do `entries`) e em `getMediaById()`
+// (consulta separada depois de um save, ver `saveEntry` abaixo — achado
+// real mostrou que a resposta da mutation não é confiável pra isso).
 const LIST_ENTRY_MEDIA_FIELDS = `
   id
   title { romaji english }
@@ -201,6 +199,7 @@ const LIST_ENTRY_MEDIA_FIELDS = `
   bannerImage
   coverImage { medium large }
   episodes
+  status
   siteUrl
   externalLinks { site url type }
   nextAiringEpisode { episode airingAt timeUntilAiring }
@@ -214,8 +213,7 @@ function strToFuzzyDate(s) {
 
 // Campos da entrada em si (não do anime) — `startedAt`/`completedAt` aqui
 // pra dar pro popup decidir se já tem data (não sobrescrever, mesma regra
-// da v0.1.1 — ver `computeAutoDates` em popup.js) sem precisar de uma
-// segunda busca.
+// da v0.1.1 — ver `computeAutoDates` em popup.js).
 const LIST_ENTRY_FIELDS = `
   id
   status
@@ -223,7 +221,6 @@ const LIST_ENTRY_FIELDS = `
   updatedAt
   startedAt { year month day }
   completedAt { year month day }
-  media { ${LIST_ENTRY_MEDIA_FIELDS} }
 `;
 
 async function getViewerId() {
@@ -253,7 +250,7 @@ export async function getListCache() {
       MediaListCollection(userId: $userId, type: ANIME, chunk: $chunk, perChunk: 500) {
         hasNextChunk
         lists {
-          entries { ${LIST_ENTRY_FIELDS} }
+          entries { ${LIST_ENTRY_FIELDS} media { ${LIST_ENTRY_MEDIA_FIELDS} } }
         }
       }
     }
@@ -272,6 +269,19 @@ export async function getListCache() {
   return entries;
 }
 
+// Busca só os dados do anime (`Media`), fresca e direta — não a nested
+// `media` de dentro de uma mutation. Achado real (usuário, 2026-07-19): a
+// resposta do `SaveMediaListEntry` vinha com `media.externalLinks`/
+// `nextAiringEpisode` vazios/nulos mesmo pra anime com esses dados
+// confirmados — uma consulta direta em `Media(id: ...)`, feita logo depois,
+// sempre devolveu certo nos testes. Chamada extra por save, mas elimina a
+// necessidade de adivinhar/preservar dado antigo no cache.
+async function getMediaById(mediaId) {
+  const gql = `query ($id: Int) { Media(id: $id, type: ANIME) { ${LIST_ENTRY_MEDIA_FIELDS} } }`;
+  const res = await gqlFetch(gql, { id: Number(mediaId) });
+  return res.data.Media;
+}
+
 // Grava/atualiza uma entrada da lista — cobre adicionar (busca, estado 1),
 // gravar progresso (estado 4), Plan to watch/Dropar/Pausar/trocar status
 // (tela de detalhes, estado 3). Um wrapper só pra tudo. Sempre usa
@@ -279,10 +289,8 @@ export async function getListCache() {
 // `mediaId` (confirmado contra o comportamento real do MALSync em sessão
 // anterior deste projeto — ver AGENTS.md — salvar sem `id` atualiza a
 // entrada existente em vez de duplicar), então não precisa saber se o anime
-// já tem entrada ou não antes de chamar. Pede `media { ... }` na resposta
-// pra dar pra atualizar o cache local direto, sem segunda busca (ver
-// `store.patchListCacheEntry`). `startDate`/`finishDate` são strings
-// "YYYY-MM-DD" (ou undefined) — mesma regra da v0.1.1 pra quando
+// já tem entrada ou não antes de chamar. `startDate`/`finishDate` são
+// strings "YYYY-MM-DD" (ou undefined) — mesma regra da v0.1.1 pra quando
 // preenchê-las mora em popup.js (`computeAutoDates`), aqui só converte pro
 // `FuzzyDateInput` do AniList.
 export async function saveEntry({ mediaId, status, progress, startDate, finishDate }) {
@@ -300,7 +308,9 @@ export async function saveEntry({ mediaId, status, progress, startDate, finishDa
     startedAt: strToFuzzyDate(startDate),
     completedAt: strToFuzzyDate(finishDate),
   });
-  return res.data.SaveMediaListEntry;
+  const entry = res.data.SaveMediaListEntry;
+  entry.media = await getMediaById(mediaId);
+  return entry;
 }
 
 export const id = PROVIDER_ID;
