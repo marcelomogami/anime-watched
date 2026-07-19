@@ -5,6 +5,72 @@ All notable changes to this project are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 and the project adopts [Semantic Versioning](https://semver.org/).
 
+## [1.0.0] — 2026-07-18
+
+> **From-scratch, AniList-first rewrite.** MyAnimeList support, manual mapping, and the
+> provider-selection UI are gone — the extension now reads and writes your real AniList
+> lists directly, with a new panel-style popup instead of one purely reactive to the
+> current tab.
+
+### Added
+
+- **AniList lists are now the source of truth.** No more local mapping table
+  (`cr:<id>#S<n>` / `pv:<detailId>` → target) — the extension keeps a local cache of the
+  whole AniList collection (`MediaListCollection`) and matches the detected Crunchyroll/
+  Prime Video page against it, primarily via the streaming link AniList has on file
+  (`externalLinks`), falling back to matching by title (romaji/English/synonyms, exact
+  match) when that link is missing or outdated. Cache refreshes automatically about once a
+  week, on demand via a **⟳ re-sync** button, and is patched instantly whenever the
+  extension itself saves progress or adds a new anime.
+- **New panel-style popup with four screens**, reacting to the active tab and whether a
+  match was found in the cache:
+  - **List panel** — Watching/Plan to Watch tabs, compact cards (banner, progress bar,
+    countdown to the next episode, source badge), each with a **Details** button.
+  - **Detail screen** — full view of one anime: editable progress, Save, Plan to Watch,
+    Pause, Drop, links to AniList and the source platform, "currently in: `<list>`"
+    indicator for every status (not just the ones that need confirmation to leave).
+  - **Quick screen** — recognized episode page: episode number pre-filled, one-click Save,
+    a **Details** button for anything else.
+  - **Search screen** — reuses the existing search UI against AniList instead of a
+    provider; destination depends on whether it came from an anime page (Plan to Watch) or
+    an episode page (Watching + progress).
+- **Confirmation before leaving "other lists"** (Completed/Dropped/Paused/Rewatching):
+  saving progress or picking Plan to Watch on an anime currently in one of those now shows
+  a warning with the current list first — a second click confirms the move. Going from Plan
+  to Watch to Watching stays automatic, no confirmation needed.
+- **Title-based fallback matching for Crunchyroll** (`findByTitle` in `store.js`, shared
+  with the existing Prime Video fallback): a real check found 202 of 326 Crunchyroll links
+  in one user's AniList data still on the pre-2018 URL format (no series ID), which never
+  matched by ID alone — see [Known limitations](README.md#known-limitations) in the README.
+
+### Changed
+
+- **Automatic start/finish dates** (ported from v0.1.1's `computeDates`, unchanged rule):
+  start date is set to today the first time progress leaves 0; finish date + `Completed`
+  status once progress reaches the known episode total. The old **"Finish"** button (for
+  completing when the total is unknown, e.g. a simulcast) was **not** ported — known,
+  accepted gap.
+- Details button (panel card + quick screen) recolored (purple/violet) and moved before the
+  source badge, so multiple platform badges stay uniform as more sources get added; Plan to
+  Watch (turquoise) and Pause (amber) buttons recolored off the previous generic gray, all
+  chosen to avoid clashing with likely future platform colors (Netflix red, Hulu green,
+  Twitch/HBO Max purple).
+- Watching/Plan to Watch switcher restyled as actual tabs (underline + colored active
+  state) instead of a pair of pill buttons; the manual re-sync button moved from beside the
+  tabs to the header, next to settings.
+- Crunchyroll/Prime Video source badge colors (`.src.cr`/`.src.pv`) now apply everywhere the
+  classes are used, not just inside the panel's cards — fixes the detail screen's source
+  button rendering white instead of platform-colored.
+- AniList link now comes before the source badge in the detail screen's last row.
+
+### Removed
+
+- `providers/mal.js`, `providers/index.js` (generic provider registry), `providers/
+  shared.js` (MAL↔AniList `idMal` cross-reference) — AniList is the only backend now, no
+  more provider abstraction.
+- Provider-selection UI (`popup.html`/`popup.js`) and `auth/mal/*` storage keys.
+- MAL `host_permissions`.
+
 ## [0.5.3] — 2026-07-16
 
 > **Last release of this architecture.** v1.0.0 is a from-scratch, AniList-first rewrite —
@@ -297,6 +363,7 @@ Crunchyroll to MyAnimeList via the toolbar button.
 - No automatic end-of-episode detection, no score/rewatch, no Chrome Web Store publishing
   (personal use, loaded unpacked).
 
+[1.0.0]: https://github.com/marcelomogami/anime-watched/releases/tag/v1.0.0
 [0.5.3]: https://github.com/marcelomogami/anime-watched/releases/tag/v0.5.3
 [0.5.2]: https://github.com/marcelomogami/anime-watched/releases/tag/v0.5.2
 [0.5.1]: https://github.com/marcelomogami/anime-watched/releases/tag/v0.5.1

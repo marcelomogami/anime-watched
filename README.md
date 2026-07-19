@@ -3,26 +3,26 @@
 *[Leia isso em português](README.pt-BR.md)*
 
 Chrome extension (Manifest V3) that logs, with one click, the episode you just watched on
-**Crunchyroll** or **Prime Video** to your anime list — on **MyAnimeList (MAL)** or
-**AniList**, whichever you choose as your active provider.
+**Crunchyroll** or **Prime Video** to your real **AniList** lists — no manual mapping, no
+separate tracking backend to configure.
 
-No server, no backend: OAuth, provider API calls, and the mapping table all live inside the
-extension (`chrome.storage`).
+No server, no backend: OAuth and the AniList API calls all live inside the extension
+(`chrome.storage`). Your AniList Watching/Plan to Watch lists *are* the data — the extension
+just reads and writes them directly.
 
 Interface available in **pt-BR** and **en** (Chrome picks based on the browser's
 language).
 
 ## Screenshots
 
-| Episode detected → save | Search/pick on the provider | Manage mappings |
+| Your list, at a glance | Anime detail — save, pause, drop | New anime? Just search |
 |---|---|---|
-| ![Popup with a detected episode and an already-mapped anime](screenshots/popup-main-en.png) | ![Popup with search results](screenshots/popup-search-en.png) | ![Saved mappings management screen](screenshots/popup-mappings-en.png) |
+| ![Popup showing the Watching list, with progress bars and countdowns](screenshots/popup-panel-en.png) | ![Popup showing an anime's detail screen with progress, status, and action buttons](screenshots/popup-detail-en.png) | ![Popup showing AniList search results for a new anime](screenshots/popup-search-en.png) |
 
 ## How it works
 
-Two independent choices come together here: the **source** — Crunchyroll or Prime Video,
-detected automatically from the tab you're on — and the **provider** — MAL or AniList,
-picked by you — wherever progress actually gets tracked.
+The popup is a small state machine that reacts to whatever tab is active, and always reads
+and writes your **real AniList lists** — there's no local mapping table standing in for them.
 
 1. **Extraction (per source):**
    - **Crunchyroll:** on an episode page (`/watch/...`), reads series, season, and
@@ -33,32 +33,26 @@ picked by you — wherever progress actually gets tracked.
      the player's DOM overlay. On the detail page (`/detail/{id}`) — no player open —
      reads season and title from the page's metadata; the detail ID itself is already
      season-specific.
-2. **Provider setup:** pick MAL or AniList in the setup screen — one active at a time,
-   switchable anytime from the **⚙** button in the header. Each keeps its own login.
-3. Click the extension icon → the popup shows what it detected.
-4. **First time for a season:** match it to the right anime on the active provider —
-   automatic search by title (AniList's multilingual synonyms handle Prime Video's
-   localized titles noticeably better than MAL's plain-title search), or paste the
-   provider's URL/ID. If that season is already mapped on the *other* provider, the
-   extension tries to resolve it automatically via AniList's `idMal` cross-reference
-   before asking you to search again.
-5. From there, two options:
-   - **Save** — updates your watched-episode count on the provider (**Finish** to close
-     out the season).
-   - **Plan to watch** — saves the mapping without recording any progress. If the anime
-     isn't in any list yet, this also sets its status to "plan to watch" there (0
-     episodes); if it's already in a list, only the local mapping is saved — existing
-     progress is never touched. Useful for bookmarking something you haven't started yet,
-     straight from the anime's own page — without Crunchyroll or Prime Video recording the
-     episode as "opened".
-
-Mappings are stored per **season**: on Crunchyroll, `crSeriesId#SseasonNumber` (e.g.,
-`GT00371630#S1`); on Prime Video, `pv:<detailId>` (e.g., `pv:0GZCWV7IOJ8M9624JD5A4HA66B`)
-— each season already has its own `detail/<ID>` there. Either way this handles the common
-case of a season being a separate entry on the provider. Each mapping keeps a target **per
-provider**, so switching your active provider never discards a mapping you already had —
-worst case, that one season needs mapping again on the new provider (and the cross-ref above
-usually avoids even that).
+2. **Matching against your lists:** the extension keeps a local cache of your whole AniList
+   Watching/Plan to Watch/etc. collection (`MediaListCollection`, refreshed automatically
+   about once a week or on demand). What's detected on the page is matched against that
+   cache — primarily by the streaming link AniList has on file for that anime
+   (`externalLinks`), falling back to matching by title when that link is missing or
+   outdated (see [Known limitations](#known-limitations)).
+3. Click the extension icon → depending on the page and whether a match was found, one of
+   four screens shows up:
+   - **No match found:** search AniList directly (by title, or paste a URL/ID) and pick the
+     right anime. Picking it from an anime/series page adds it as **Plan to Watch** (0
+     episodes — that page never has an episode number to record); picking it from an episode
+     page saves it straight as **Watching**, with that episode's progress.
+   - **No relevant page open:** the **list panel** — tabs for Watching / Plan to Watch, each
+     card showing progress, a countdown to the next episode when it's still airing, and a
+     source badge that links straight to Crunchyroll/Prime Video.
+   - **Anime/series page, already in a list:** the **detail screen** — progress (editable),
+     Save, Plan to Watch, Pause, Drop, links to AniList and to the source platform.
+   - **Episode page, anime already recognized:** the **quick screen** — the detected episode
+     number, ready to save with one click; a **Details** button jumps to the full detail
+     screen for anything else (pausing, dropping, etc.).
 
 ## Installation (unpacked)
 
@@ -68,38 +62,12 @@ usually avoids even that).
 4. The extension shows up in the toolbar. Pin the icon if you'd like.
 
 > The extension ID (and therefore the Redirect URI) stays stable as long as the folder
-> doesn't move. If you move the folder, the ID changes and every provider's app needs the
-> new Redirect URI.
+> doesn't move. If you move the folder, the ID changes and the AniList app needs the new
+> Redirect URI.
 
-## Registering the app on your provider
+## Registering the app on AniList
 
-Pick MAL, AniList, or both — the extension only requires credentials for whichever
-provider is active.
-
-### MyAnimeList
-
-1. Open the extension popup, pick **MAL** as the provider, and copy the **Redirect URI**
-   shown (`https://<extension-id>.chromiumapp.org/`).
-2. Go to [myanimelist.net/apiconfig](https://myanimelist.net/apiconfig) → **Create ID**.
-3. Fill in:
-   - **App Type:** `web` — generates a **Client ID** and **Client Secret** (MAL requires
-     the secret when exchanging the token). Choosing `other` makes it a public client with
-     no secret.
-   - **App Redirect URL:** paste the Redirect URI from step 1
-   - **App Description:** minimum 50 characters, no special characters
-   - Other required fields (name, homepage, etc.): up to you
-4. Save and copy the **Client ID** (and **Client Secret**, if it's a `web` app).
-5. In the extension popup: paste the **Client ID** and **Client Secret** → **Save
-   credentials** → **Log in to MAL** and authorize.
-
-Login uses OAuth2 with PKCE (`plain` method, a MAL requirement). The Client Secret (when
-present) is typed by you and stays only in your machine's `chrome.storage.local` — it's
-never embedded in the code or committed.
-
-### AniList
-
-1. Open the extension popup, pick **AniList** as the provider, and copy the **Redirect
-   URI** shown.
+1. Open the extension popup and copy the **Redirect URI** shown on the login screen.
 2. Go to [anilist.co/settings/developer](https://anilist.co/settings/developer) → **Create
    New Application**.
 3. Fill in a name and paste the Redirect URI from step 1.
@@ -113,17 +81,14 @@ in again.
 
 ## Security notes
 
-`chrome.storage.local` — where auth lives (Client ID/Secret, access/refresh tokens) —
-isn't encrypted at rest; it's plain LevelDB on disk. It's isolated from other extensions
-and from any web page you visit, but not from anything with local read access to your
-Chrome profile (malware, another OS user, etc.). This is a deliberate split: only the
-mapping table syncs via `chrome.storage.sync` — it holds no credentials, just
-Crunchyroll/Prime Video ↔ provider mapping keys.
+`chrome.storage.local` — where auth (Client ID, access token) and the local list cache
+live — isn't encrypted at rest; it's plain LevelDB on disk. It's isolated from other
+extensions and from any web page you visit, but not from anything with local read access to
+your Chrome profile (malware, another OS user, etc.).
 
-If you ever suspect a token leaked, revoke access straight from the provider's own
-settings — [myanimelist.net/apiconfig](https://myanimelist.net/apiconfig) for MAL,
-[anilist.co/settings/developer](https://anilist.co/settings/developer) for AniList — that
-invalidates it immediately, no need to touch the extension.
+If you ever suspect a token leaked, revoke access straight from
+[anilist.co/settings/developer](https://anilist.co/settings/developer) — that invalidates it
+immediately, no need to touch the extension.
 
 ## Usage
 
@@ -131,50 +96,54 @@ invalidates it immediately, no need to touch the extension.
   (`/series/...`), if you only want to bookmark it — and click the extension icon.
 - **Prime Video:** press play on the episode, or just open the anime's detail page
   (`/detail/...`) without playing anything, and click the extension icon.
-- **New season:** search/pick the anime on the active provider (or paste the URL/ID), then
-  either:
-  - adjust the episode number and click **Save** (or **Finish** to close out the season),
-    or
-  - click **Plan to watch** to bookmark it without recording any progress.
-- **Season already mapped:** the popup shows the target and your current progress; adjust
-  the number if you want and click **Save**.
-- **View mappings:** lists everything mapped so far, with a button that opens the anime's
-  page on the source platform (**CR ↗** / **PV ↗**, colored by platform), plus the options
-  to open it on the provider (**MAL ↗** / **AniList ↗**), **re-map**, or **delete**.
-- **Switch provider:** the **⚙** button in the header (or the setup screen shown before
-  you're logged in) opens the provider picker at any time.
+- **New anime:** search/pick it on AniList (or paste the URL/ID); the destination (Plan to
+  Watch vs. Watching + progress) depends on whether you came from the anime page or an
+  episode page.
+- **Already in a list:** the popup shows the right screen automatically — quick save for a
+  recognized episode, or the full detail screen from the anime's own page.
+- **No relevant page open:** the list panel — Watching / Plan to Watch tabs, with a manual
+  **⟳ re-sync** button next to settings if you want to pull in changes made outside the
+  extension right away.
 
 ### Behavior details
 
-- **Won't regress on its own:** if the provider already shows a higher number than the
-  episode you're about to save, the extension warns you and requires a second click before
+- **Won't regress on its own:** if AniList already shows a higher episode number than the
+  one you're about to save, the extension warns you and requires a second click before
   reducing it.
-- **Episode adjustment:** Crunchyroll's numbering doesn't always match the provider's
-  (e.g., a cour with absolute numbering) — that's why the number is editable before saving.
-- **`status`:** becomes "completed" once the episode reaches the provider's known total;
-  otherwise it stays "watching".
-- **Automatic start date:** when saving, if the provider's progress is at **0** (and the
-  start date is empty), sets the start date to **today**. The trigger is zeroed progress,
-  not episode number — so it works even when Crunchyroll uses sequential numbering that
-  differs from the provider's (e.g., `E25` on CR = `S2E1` there).
-- **Automatic finish date:** when the season is completed (number ≥ the provider's total,
-  with an empty finish date), sets the finish date to **today**.
-- **"Finish" button:** explicitly marks completed + finish date = **today**, useful when
-  the provider doesn't know the total (simulcast/ongoing season). Adjusts progress to the
-  total when it's known.
+- **Episode adjustment:** Crunchyroll's numbering doesn't always match AniList's (e.g., a
+  cour with absolute numbering) — that's why the number is editable before saving.
+- **Automatic start date:** when saving, if progress is at **0** (and the start date is
+  empty), sets the start date to **today**. The trigger is zeroed progress, not episode
+  number — so it works even when Crunchyroll uses sequential numbering that differs from
+  AniList's (e.g., `E25` on CR = `S2E1` there).
+- **Automatic completion:** the anime completes itself — status becomes `Completed`, finish
+  date = **today** — once progress reaches the known episode total. There's no separate
+  "Finish" button for the rare case of an unknown total (e.g. an ongoing simulcast) — known
+  gap, not ported from the previous architecture.
 - **Never overwrites dates:** start and finish dates are only filled in when empty; an
-  existing date on the provider is preserved.
-- **"Plan to watch" never overwrites progress:** it only sets the "plan to watch" status on
-  the provider if the anime isn't in any list yet. If it's already watching, completed,
-  etc., clicking it just saves the local mapping — your provider status/progress stays
-  untouched.
-- **No local progress tracking:** the extension doesn't keep a local copy of "episodes
-  watched" — that number always lives on the provider and is read live from there when you
-  open the popup for an already-mapped anime. What's stored locally (`chrome.storage`) is
-  the Crunchyroll/Prime Video ↔ provider mapping, per provider.
-- **Cross-provider resolution:** if a season is already mapped on one provider and you
-  switch to the other, the extension tries AniList's `idMal` field to resolve the match
-  automatically before falling back to a manual search — works in both directions (MAL↔AniList).
+  existing date on AniList is preserved.
+- **Leaving "other lists" (Completed/Dropped/Paused/Rewatching) requires confirmation:**
+  saving progress or picking Plan to Watch on an anime that's currently in one of those
+  shows a warning with its current list first — click again to confirm moving it. Going
+  from Plan to Watch to Watching is natural progress and never asks for confirmation.
+- **No local progress tracking:** the extension doesn't keep its own copy of "episodes
+  watched" — progress always lives on AniList. What's cached locally
+  (`chrome.storage.local`) is a read-through copy of your lists, refreshed automatically
+  (about once a week, or manually via **⟳**) and patched instantly whenever the extension
+  itself saves something.
+
+## Known limitations
+
+- **Crunchyroll matching can miss anime with an outdated link on AniList.** Recognition
+  primarily works by matching the series ID in the page's URL against the Crunchyroll link
+  AniList has on file (`externalLinks`) for that anime. A real check against one user's list
+  found **202 out of 326** Crunchyroll links still using the pre-2018 URL format
+  (`crunchyroll.com/<slug>`, no series ID) — those never match by ID. A title-based fallback
+  (exact match against AniList's romaji/English title or synonyms) covers most of these, but
+  it can still miss if the Crunchyroll page's title doesn't match any of the three exactly
+  (different translation/spelling). When that happens, the popup falls back to the search
+  screen even though the anime is already in your list — just search and pick it again, it
+  won't create a duplicate.
 
 ## Structure
 
@@ -185,16 +154,13 @@ extension/
     pt_BR/messages.json  # UI strings (default language)
     en/messages.json     # UI strings (English)
   src/
-    background.js  # orchestration: detects the source, reads the tab's episode, routes to the active provider, stores the map
+    background.js  # orchestration: detects the source, reads the tab's episode, resolves which of the 4 states to show, talks to AniList
     sources/
       crunchyroll.js  # extracts series/season/episode from Crunchyroll's JSON-LD
       primevideo.js   # extracts series/season/episode from Prime Video's player overlay
     providers/
-      index.js    # provider registry (mal, anilist)
-      mal.js      # MAL API client (OAuth PKCE, search, save progress)
-      anilist.js  # AniList API client (OAuth Implicit Grant, GraphQL search/progress)
-      shared.js   # helpers shared between providers (ID parsing, MAL↔AniList cross-reference)
-    store.js       # chrome.storage wrapper (config, tokens, mapping table — namespaced per provider)
+      anilist.js  # AniList API client (OAuth Implicit Grant, GraphQL search/list/save)
+    store.js       # chrome.storage wrapper (auth, local list cache, CR/PV → AniList resolution)
     popup.html/js  # the interface (state machine), strings via chrome.i18n
   icons/
 docs/            # internal design notes (pt-BR), one folder per major version
@@ -202,9 +168,9 @@ docs/            # internal design notes (pt-BR), one folder per major version
 
 ## Current scope
 
-Crunchyroll and Prime Video as sources (for Jellyfin, the `jellyfin-ani-sync` plugin
-already covers it); MAL and AniList as providers. No automatic end-of-episode detection,
-no score/rewatch, no Chrome Web Store publishing — personal use, loaded unpacked.
+Crunchyroll and Prime Video as sources; AniList as the only tracking backend. No automatic
+end-of-episode detection, no score/rewatch, no Chrome Web Store publishing — personal use,
+loaded unpacked.
 
 ## License
 

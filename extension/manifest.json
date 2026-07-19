@@ -1,15 +1,13 @@
 {
   "manifest_version": 3,
   "name": "Anime Watched",
-  "version": "0.5.3",
+  "version": "1.0.0",
   "default_locale": "en",
   "description": "__MSG_extDescription__",
   "permissions": ["storage", "identity", "scripting", "activeTab"],
   "host_permissions": [
     "*://*.crunchyroll.com/*",
     "*://*.primevideo.com/*",
-    "https://api.myanimelist.net/*",
-    "https://myanimelist.net/*",
     "https://graphql.anilist.co/*"
   ],
   "background": {

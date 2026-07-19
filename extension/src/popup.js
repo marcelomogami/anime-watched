@@ -1,7 +1,8 @@
-// popup.js — máquina de estados da interface.
-// Estados: setup · fora-de-watch · episódio(pick/target) · gestão de mapeamentos.
-// Agnóstico a provider: fala só via mensagens com background.js, que resolve
-// tudo contra o provider ativo (MAL/AniList) — ver docs/contexto-providers.md.
+// popup.js — máquina de estados da interface, reativa à aba atual.
+// AniList é o único backend (v1.0.0, ver docs/1.0.0/contexto.md) — fala só
+// via mensagens com background.js. Estados: setup (login) · 1 (busca) ·
+// 2 (painel de lista) · 3 (tela de detalhes) · 4 (tela rápida de episódio) —
+// ver docs/1.0.0/visao.md § "Como o popup funciona".
 
 const $ = (id) => document.getElementById(id);
 
@@ -60,7 +61,7 @@ function escapeHtml(s) {
   );
 }
 
-// Extrai um id numérico de URL "*/anime/{id}/*" (MAL e AniList) ou id colado.
+// Extrai um id numérico de URL "*/anime/{id}/*" (AniList) ou id colado.
 function parseAnimeId(input) {
   const s = (input || '').trim();
   if (/^\d+$/.test(s)) return Number(s);
@@ -72,13 +73,6 @@ function parseAnimeId(input) {
 function cleanTitleGuess(title) {
   return (title || '').split(/\s[-|]\s/)[0].trim();
 }
-
-// URL de onde criar/gerenciar o app OAuth de cada provider (só usada na tela
-// de setup, pro link de registro do redirect URI).
-const PROVIDER_APP_URL = {
-  mal: 'https://myanimelist.net/apiconfig',
-  anilist: 'https://anilist.co/settings/developer',
-};
 
 function openUrl(url) {
   if (!url) return;
@@ -97,166 +91,437 @@ function todayStr() {
   );
 }
 
-// Renderiza a linha de progresso + datas a partir do currentTarget.
-function renderProgress() {
-  const t = currentTarget;
-  if (!t) return;
-  const watched = t.currentWatched || 0;
-  const base =
-    t.inList || watched > 0
-      ? t.total
-        ? tr('malHasProgressWithTotal', { watched, total: t.total, provider: providerLabel })
-        : tr('malHasProgressNoTotal', { watched, provider: providerLabel })
-      : t.total
-        ? tr('notInListWithTotal', { total: t.total })
-        : tr('notInListNoTotal');
-  const dt = [
-    t.startDate ? tr('startDateLabel', { date: t.startDate }) : '',
-    t.finishDate ? tr('finishDateLabel', { date: t.finishDate }) : '',
-  ]
-    .filter(Boolean)
-    .join(' · ');
-  $('targetProgress').textContent = dt ? `${base} · ${dt}` : base;
-}
-
-// --- estado em memória ---
-let currentEpisode = null; // { displayId, seasonNumber, episodeNumber, seriesTitle, mapKey, ... }
-let currentTarget = null; // { id, title, total, picture, url, currentWatched }
-let forceWrite = false; // confirma gravação que reduz progresso
-let remapOnly = false; // re-mapeando pela tela de gestão (não grava episódio)
-let providerId = 'mal';
-let providerLabel = 'MAL';
-
-const TOP_CARDS = ['setupCard', 'nowatchCard', 'mainCard', 'mappingsCard'];
+const TOP_CARDS = ['setupCard', 'mainCard', 'panelCard', 'detailCard', 'quickCard'];
 function showCard(id) {
   for (const c of TOP_CARDS) $(c).classList.toggle('hidden', c !== id);
+  $('resyncBtn').classList.toggle('hidden', id !== 'panelCard');
 }
 
-// Reaplica os textos que dependem do provider ativo nos cards já visíveis
-// (rodado toda vez que o provider muda ou o status é recarregado).
-function applyProviderLabels() {
-  $('openMal').textContent = `${providerLabel} ↗`;
-  $('saveBtn').textContent = tr('saveBtnLabel', { provider: providerLabel });
-  $('searchQuery').placeholder = tr('searchPlaceholder', { provider: providerLabel });
-  $('pasteUrlLabel_').textContent = tr('pasteUrlLabel', { provider: providerLabel });
-  $('loginBtn').textContent = tr('setupLoginBtn', { provider: providerLabel });
-  $('clientIdLabel_').textContent = tr('setupClientIdLabel', { provider: providerLabel });
-  $('redirectLabel').innerHTML = tr('setupRedirectLabel', {
-    provider: providerLabel,
-    url: PROVIDER_APP_URL[providerId] || '#',
-  });
-}
-
-// ---------- SETUP ----------
-
-async function populateProviderSelect(active) {
-  const resp = await send({ type: 'GET_PROVIDERS' });
-  const select = $('providerSelect');
-  select.innerHTML = '';
-  const options = (resp.ok && resp.options) || [{ id: 'mal', label: 'MAL' }];
-  for (const opt of options) {
-    const el = document.createElement('option');
-    el.value = opt.id;
-    el.textContent = opt.label;
-    select.appendChild(el);
-  }
-  select.value = active || (resp.ok && resp.active) || 'mal';
-}
+// ---------- SETUP (login no AniList) ----------
 
 async function showSetup(status) {
-  providerId = status.providerId || providerId;
-  providerLabel = status.providerLabel || providerLabel;
-  await populateProviderSelect(providerId);
   $('redirectUri').textContent = status.redirectUri || '—';
   $('clientId').value = status.clientId || '';
-  $('clientSecret').value = status.clientSecret || '';
-  $('clientSecretField').classList.toggle('hidden', status.needsClientSecret === false);
-  applyProviderLabels();
+  $('redirectLabel').innerHTML = tr('setupRedirectLabel', {
+    provider: 'AniList',
+    url: 'https://anilist.co/settings/developer',
+  });
+  $('clientIdLabel_').textContent = tr('setupClientIdLabel', { provider: 'AniList' });
+  $('loginBtn').textContent = tr('setupLoginBtn', { provider: 'AniList' });
   showCard('setupCard');
 }
 
-// ---------- EPISÓDIO ----------
+// ---------- [estado 2] PAINEL DE LISTA ----------
+// Reaproveita a estilização de `.mapcard` (banner 3:1, fallback pro pôster)
+// — ver docs/1.0.0/visao.md § "Painel de lista (estado 2)". Sem Gravar/Plan
+// to watch/Dropar/Pausar aqui de propósito — isso fica todo na tela de
+// detalhes (estado 3); o botão "ver detalhes" de cada card leva pra lá.
 
-const NOWATCH_MESSAGES = {
-  NOT_SUPPORTED_SITE: 'errNotSupportedSite',
-  NOT_A_WATCH_PAGE: 'errNotAWatchPage',
-  NO_PLAYER_OPEN: 'errNoPlayerOpen',
+let panelData = null; // { fetchedAt, watching: [...], planning: [...] }
+let panelTab = 'watching';
+
+// Segundos → "Xd Xh" / "Xh" / "Xmin", só a maior unidade + a próxima.
+function formatCountdown(seconds) {
+  if (seconds == null) return '';
+  const days = Math.floor(seconds / 86400);
+  const hours = Math.floor((seconds % 86400) / 3600);
+  const mins = Math.floor((seconds % 3600) / 60);
+  if (days > 0) return `${days}d ${hours}h`;
+  if (hours > 0) return `${hours}h ${mins}min`;
+  return `${mins}min`;
+}
+
+// Ms desde `fetchedAt` → "Sincronizado há Xh"/"Xd"/"agora mesmo" — pro
+// indicador do botão de re-sync.
+function formatRelativeTime(fetchedAt) {
+  const ms = Date.now() - fetchedAt;
+  const mins = Math.floor(ms / 60000);
+  if (mins < 1) return tr('timeJustNow');
+  if (mins < 60) return tr('timeMinAgo', { n: mins });
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return tr('timeHoursAgo', { n: hours });
+  return tr('timeDaysAgo', { n: Math.floor(hours / 24) });
+}
+
+const SITE_LABEL = { cr: 'CR', pv: 'PV' };
+
+// Badge de source: só CR ou PV (as duas sources que a extensão de fato
+// suporta) — outros STREAMING do externalLinks (Netflix, YouTube, etc.) são
+// ignorados aqui, mesmo que venham antes na lista; mostrar um link pra uma
+// plataforma que a extensão não integra seria enganoso (docs/1.0.0/visao.md
+// § "Painel de lista"; virou ideia de evolução futura registrada lá em
+// "Fora de escopo").
+function streamingLink(media) {
+  for (const link of media.externalLinks || []) {
+    if (link.type !== 'STREAMING') continue;
+    const url = link.url.toLowerCase();
+    if (url.includes('crunchyroll')) return { url: link.url, site: 'cr', label: SITE_LABEL.cr };
+    if (url.includes('amazon') || url.includes('primevideo')) {
+      return { url: link.url, site: 'pv', label: SITE_LABEL.pv };
+    }
+  }
+  return null;
+}
+
+function renderPanelCard(entry) {
+  const media = entry.media;
+  const title = media.title?.romaji || media.title?.english || '?';
+  const bannerSrc = media.bannerImage || media.coverImage?.large || media.coverImage?.medium || '';
+  const row = document.createElement('div');
+  row.className = 'mapcard';
+  row.innerHTML = `
+    ${bannerSrc ? `<img class="banner" src="${escapeHtml(bannerSrc)}" alt="">` : '<div class="banner"></div>'}
+    <div class="info">
+      <div class="v">${escapeHtml(title)}</div>
+      <div class="subline">
+        <div class="k">${media.episodes ? tr('panelProgress', { progress: entry.progress, total: media.episodes }) : tr('panelProgressNoTotal', { progress: entry.progress })}</div>
+      </div>
+      <div class="progressbar"><div class="fill" style="width: ${media.episodes ? Math.min(100, (entry.progress / media.episodes) * 100) : 0}%"></div></div>
+      ${media.nextAiringEpisode ? `<div class="countdown">${escapeHtml(tr('panelNextEpisodeIn', { time: formatCountdown(media.nextAiringEpisode.timeUntilAiring) }))}</div>` : ''}
+    </div>`;
+  const actions = document.createElement('div');
+  actions.className = 'actions';
+  const details = document.createElement('button');
+  details.className = 'details';
+  details.textContent = tr('viewDetailsBtn');
+  details.onclick = () => showDetail(entry, { fromPanel: true });
+  actions.appendChild(details);
+  const link = streamingLink(media);
+  if (link) {
+    const btn = document.createElement('button');
+    btn.className = link.site ? `src ${link.site}` : 'ghost';
+    btn.textContent = `${link.label} ↗`;
+    btn.onclick = () => openUrl(link.url);
+    actions.appendChild(btn);
+  }
+  row.appendChild(actions);
+  return row;
+}
+
+function renderPanelTab() {
+  $('tabWatching').classList.toggle('active', panelTab === 'watching');
+  $('tabPlanning').classList.toggle('active', panelTab === 'planning');
+  const list = $('panelList');
+  list.innerHTML = '';
+  const entries = (panelTab === 'watching' ? panelData?.watching : panelData?.planning) || [];
+  if (entries.length === 0) {
+    const key = panelTab === 'watching' ? 'panelEmptyWatching' : 'panelEmptyPlanning';
+    list.innerHTML = `<div class="muted">${tr(key)}</div>`;
+    return;
+  }
+  for (const entry of entries) list.appendChild(renderPanelCard(entry));
+}
+
+async function showPanel() {
+  showCard('panelCard');
+  $('panelList').innerHTML = `<div class="muted">${tr('panelLoading')}</div>`;
+  const resp = await send({ type: 'GET_PANEL_ENTRIES' });
+  if (!resp.ok) {
+    $('panelList').innerHTML = `<div class="muted">${escapeHtml(resp.error || tr('panelErrLoading'))}</div>`;
+    return;
+  }
+  panelData = resp;
+  $('panelSyncInfo').textContent = tr('panelSyncedAgo', { time: formatRelativeTime(resp.fetchedAt) });
+  renderPanelTab();
+}
+
+// Re-sync manual — refaz a MediaListCollection inteira e substitui o cache
+// (docs/1.0.0/design.md § "Cache local"); o gatilho automático de 7 dias
+// mora em `getPanelEntries()` (background.js).
+async function onResync() {
+  const btn = $('resyncBtn');
+  btn.disabled = true;
+  $('panelSyncInfo').textContent = tr('panelSyncingMsg');
+  const resp = await send({ type: 'RESYNC_LIST' });
+  btn.disabled = false;
+  if (!resp.ok) {
+    setMsg(resp.error || tr('panelResyncErr'), 'err');
+    $('panelSyncInfo').textContent = tr('panelSyncedAgo', { time: formatRelativeTime(panelData?.fetchedAt || 0) });
+    return;
+  }
+  panelData = resp;
+  $('panelSyncInfo').textContent = tr('panelSyncedAgo', { time: formatRelativeTime(resp.fetchedAt) });
+  setMsg(tr('panelResyncedMsg'), 'ok');
+  renderPanelTab();
+}
+
+// ---------- [estado 3] TELA DE DETALHES ----------
+// Sobre um anime só, sem relação com nenhum episódio específico — reaberta
+// automaticamente (aba na página do anime/série já numa lista) ou
+// manualmente (botão "ver detalhes" no painel, ou "Detalhes" na tela
+// rápida) — ver docs/1.0.0/visao.md § "Tela de detalhes (estado 3)".
+// Gravar/Plan to watch e Dropar/Pausar usam a mesma mutation (SAVE_ENTRY →
+// providers/anilist.js:saveEntry), só muda o `status` alvo.
+
+// Status que exigem confirmação expressa pra sair (docs/1.0.0/visao.md §
+// "Anime que está em 'outras listas'") — a extensão nunca usa REPEATING
+// como destino (só como status de origem que pode aparecer aqui).
+const OUTRAS_LISTAS = ['COMPLETED', 'DROPPED', 'PAUSED', 'REPEATING'];
+const STATUS_LABEL_KEY = {
+  CURRENT: 'panelTabWatching',
+  PLANNING: 'panelTabPlanning',
+  COMPLETED: 'statusCompleted',
+  DROPPED: 'statusDropped',
+  PAUSED: 'statusPaused',
+  REPEATING: 'statusRepeating',
 };
 
-async function showEpisode() {
-  const resp = await send({ type: 'GET_CURRENT_EPISODE' });
+let detailEntry = null; // entrada atual (media + status/progress)
+let detailFromPanel = false;
+let detailPending = null; // ação aguardando confirmação (segundo clique): 'save' | 'plan' | 'drop' | 'pause'
+
+function resetDetailConfirm() {
+  detailPending = null;
+  $('detailWarn').classList.add('hidden');
+}
+
+function showDetail(entry, opts = {}) {
+  detailEntry = entry;
+  detailFromPanel = !!opts.fromPanel;
+  resetDetailConfirm();
+
+  const media = entry.media;
+  const title = media.title?.romaji || media.title?.english || '?';
+  $('detailBack').classList.toggle('hidden', !detailFromPanel);
+  const img = $('detailImg');
+  const bannerSrc = media.bannerImage || media.coverImage?.large || media.coverImage?.medium || '';
+  if (bannerSrc) img.src = bannerSrc;
+  else img.removeAttribute('src');
+  $('detailTitle').textContent = title;
+  $('detailProgress').value = String(entry.progress ?? 0);
+  $('detailTotal').textContent = media.episodes ? tr('epOfTotal', { total: media.episodes }) : '';
+
+  const statusLabel = STATUS_LABEL_KEY[entry.status];
+  $('detailStatus').classList.toggle('hidden', !statusLabel);
+  if (statusLabel) $('detailStatus').textContent = tr('detailInStatus', { status: tr(statusLabel) });
+
+  const countdown = $('detailCountdown');
+  if (media.nextAiringEpisode) {
+    countdown.textContent = tr('panelNextEpisodeIn', {
+      time: formatCountdown(media.nextAiringEpisode.timeUntilAiring),
+    });
+    countdown.classList.remove('hidden');
+  } else {
+    countdown.classList.add('hidden');
+  }
+
+  const link = streamingLink(media);
+  const sourceBtn = $('detailSourceBtn');
+  if (link) {
+    sourceBtn.className = link.site ? `src ${link.site}` : 'ghost';
+    sourceBtn.textContent = `${link.label} ↗`;
+    sourceBtn.onclick = () => openUrl(link.url);
+  } else {
+    sourceBtn.className = 'ghost hidden';
+  }
+  $('detailAnilistBtn').onclick = () => openUrl(media.siteUrl);
+
+  showCard('detailCard');
+}
+
+// Regra da v0.1.1, portada da versão anterior: completa sozinho quando o
+// progresso bate o total conhecido do anime — sem precisar de um botão
+// "Finalizar" separado (não existe nas telas novas; lacuna conhecida se o
+// total for desconhecido, ex. simulcast — caso raro, sem solução aqui).
+function computeTargetStatus(entry, progress, fallback) {
+  const total = entry.media.episodes;
+  return total && progress >= total ? 'COMPLETED' : fallback;
+}
+
+// Mesma regra da v0.1.1: início = hoje só na primeira vez que o progresso
+// sai de 0 (nunca sobrescreve se `entry` já tinha `startedAt`); fim = hoje
+// só ao completar, também sem sobrescrever. Só se aplica a Gravar — Plan to
+// watch nunca mexe em datas.
+function computeAutoDates(entry, progress, targetStatus) {
+  const dates = {};
+  if (!entry.startedAt?.year && (entry.progress || 0) === 0 && progress >= 1) {
+    dates.startDate = todayStr();
+  }
+  if (targetStatus === 'COMPLETED' && !entry.completedAt?.year) {
+    dates.finishDate = todayStr();
+  }
+  return dates;
+}
+
+// Envia a mutation e atualiza a tela em cima da resposta real (não do palpite
+// local) — status/progress finais vêm de `saveEntry` (background.js), que já
+// devolve `media` completo, então dá pra chamar `showDetail` de novo direto.
+async function saveDetail(status, progress, dates = {}) {
+  setMsg(tr('savingMsg'));
+  const resp = await send({
+    type: 'SAVE_ENTRY',
+    mediaId: detailEntry.media.id,
+    status,
+    progress,
+    startDate: dates.startDate,
+    finishDate: dates.finishDate,
+  });
   if (!resp.ok) {
-    $('nowatchMsg').textContent = tr(
-      NOWATCH_MESSAGES[resp.error] || 'errCouldNotReadEpisode',
-    );
-    showCard('nowatchCard');
+    setMsg(resp.error || tr('detailErrSave'), 'err');
     return;
   }
-  currentEpisode = resp.data;
-  remapOnly = false;
-  $('epTitle').textContent = currentEpisode.seriesTitle || tr('episodeFallback');
-  const meta =
-    currentEpisode.episodeNumber != null
-      ? tr('epMetaFormat', {
-          season: currentEpisode.seasonNumber,
-          episode: currentEpisode.episodeNumber,
-        })
-      : currentEpisode.seasonNumber != null
-        ? tr('seasonOnlyFormat', { season: currentEpisode.seasonNumber })
-        : tr('noEpisodeFormat');
+  setMsg(tr('detailSavedMsg'), 'ok');
+  showDetail(resp.entry, { fromPanel: detailFromPanel });
+}
+
+// Gravar/Plan to watch: se o status atual for uma das "outras listas", pede
+// confirmação (segundo clique) antes de mandar a mutation — PLANNING →
+// CURRENT é progressão natural, sem confirmação. Só "Gravar" auto-completa
+// e mexe em datas (ver `computeTargetStatus`/`computeAutoDates` acima).
+async function onDetailAction(action) {
+  const progress = parseInt($('detailProgress').value, 10);
+  if (!Number.isFinite(progress) || progress < 0) {
+    setMsg(tr('errInvalidEpisodeNumber'), 'err');
+    return;
+  }
+  const targetStatus =
+    action === 'save' ? computeTargetStatus(detailEntry, progress, 'CURRENT') : 'PLANNING';
+  const needsConfirm = OUTRAS_LISTAS.includes(detailEntry.status);
+  if (needsConfirm && detailPending !== action) {
+    detailPending = action;
+    $('detailWarn').textContent = tr('detailConfirmMove', {
+      status: tr(STATUS_LABEL_KEY[detailEntry.status]),
+    });
+    $('detailWarn').classList.remove('hidden');
+    return;
+  }
+  resetDetailConfirm();
+  const dates = action === 'save' ? computeAutoDates(detailEntry, progress, targetStatus) : {};
+  await saveDetail(targetStatus, progress, dates);
+}
+
+// Dropar/Pausar sempre pedem confirmação — não mexem em `progress` (a
+// mutation recebe `progress: undefined`, que o GraphQL trata como "não
+// mudar esse campo").
+async function onDetailStatusOnly(action, targetStatus, confirmMsgKey) {
+  if (detailPending !== action) {
+    detailPending = action;
+    $('detailWarn').textContent = tr(confirmMsgKey);
+    $('detailWarn').classList.remove('hidden');
+    return;
+  }
+  resetDetailConfirm();
+  await saveDetail(targetStatus, undefined);
+}
+
+// ---------- [estado 4] TELA RÁPIDA ----------
+// Página de episódio, anime já reconhecido — ver docs/1.0.0/visao.md § "Como
+// o popup funciona", item 4. Só um botão de ação (Gravar, sempre `CURRENT`
+// ou `COMPLETED` se completar) — sem Plan to watch/Dropar/Pausar aqui, isso
+// fica na tela de detalhes (estado 3), acessível pelo botão Detalhes. Mesma
+// regra de confirmação de "outras listas" que a tela de detalhes, só que o
+// progresso vem do campo de episódio detectado, não de ajuste manual.
+
+let quickEntry = null;
+let quickSource = null; // { seasonNumber, episodeNumber } detectado na aba
+let quickPending = false;
+
+function resetQuickConfirm() {
+  quickPending = false;
+  $('quickWarn').classList.add('hidden');
+}
+
+function showQuick(entry, source) {
+  quickEntry = entry;
+  quickSource = source;
+  resetQuickConfirm();
+
+  const media = entry.media;
+  const title = media.title?.romaji || media.title?.english || '?';
+  const img = $('quickImg');
+  const bannerSrc = media.bannerImage || media.coverImage?.large || media.coverImage?.medium || '';
+  if (bannerSrc) img.src = bannerSrc;
+  else img.removeAttribute('src');
+  $('quickTitle').textContent = title;
+  $('quickMeta').textContent = tr('epMetaFormat', {
+    season: source.seasonNumber,
+    episode: source.episodeNumber,
+  });
+  $('quickEpNum').value = String(source.episodeNumber ?? '');
+  $('quickTotal').textContent = media.episodes ? tr('epOfTotal', { total: media.episodes }) : '';
+
+  const statusLabel = STATUS_LABEL_KEY[entry.status];
+  $('quickStatus').classList.toggle('hidden', !statusLabel);
+  if (statusLabel) $('quickStatus').textContent = tr('detailInStatus', { status: tr(statusLabel) });
+
+  showCard('quickCard');
+}
+
+async function onQuickSave() {
+  const progress = parseInt($('quickEpNum').value, 10);
+  if (!Number.isFinite(progress) || progress < 0) {
+    setMsg(tr('errInvalidEpisodeNumber'), 'err');
+    return;
+  }
+  const needsConfirm = OUTRAS_LISTAS.includes(quickEntry.status);
+  if (needsConfirm && !quickPending) {
+    quickPending = true;
+    $('quickWarn').textContent = tr('detailConfirmMove', {
+      status: tr(STATUS_LABEL_KEY[quickEntry.status]),
+    });
+    $('quickWarn').classList.remove('hidden');
+    return;
+  }
+  resetQuickConfirm();
+  const targetStatus = computeTargetStatus(quickEntry, progress, 'CURRENT');
+  const dates = computeAutoDates(quickEntry, progress, targetStatus);
+  setMsg(tr('savingMsg'));
+  const resp = await send({
+    type: 'SAVE_ENTRY',
+    mediaId: quickEntry.media.id,
+    status: targetStatus,
+    progress,
+    startDate: dates.startDate,
+    finishDate: dates.finishDate,
+  });
+  if (!resp.ok) {
+    setMsg(resp.error || tr('detailErrSave'), 'err');
+    return;
+  }
+  setMsg(tr('detailSavedMsg'), 'ok');
+  showQuick(resp.entry, { seasonNumber: quickSource?.seasonNumber, episodeNumber: progress });
+}
+
+// ---------- [estado 1] BUSCA ----------
+// Reaproveita o HTML/CSS de busca (`pickArea`, dentro do `mainCard`,
+// `.candidate`) — busca direto no AniList (`SEARCH_ANIME`/`GET_ANIME_BY_ID`).
+// Ver docs/1.0.0/visao.md § "Como o popup funciona", item 1.
+
+let state1Source = null; // dado bruto detectado na aba (vindo do GET_STATE)
+
+function showSearchState1(source) {
+  state1Source = source;
+  $('epTitle').textContent = source.seriesTitle || tr('episodeFallback');
   $('epMeta').textContent =
-    meta + (currentEpisode.displayId ? ` · ${currentEpisode.displayId}` : '');
+    source.episodeNumber != null
+      ? tr('epMetaFormat', { season: source.seasonNumber, episode: source.episodeNumber })
+      : tr('seasonOnlyFormat', { season: source.seasonNumber });
+  $('searchQuery').placeholder = tr('searchPlaceholderAnilist');
+  $('pasteUrlLabel_').textContent = tr('pasteUrlLabelAnilist');
   showCard('mainCard');
 
-  if (!currentEpisode.mapKey) {
-    // sem id da série (fallback og do CR): não dá pra mapear por temporada
-    $('pickArea').classList.add('hidden');
-    $('targetArea').classList.add('hidden');
-    setMsg(tr('errCouldNotIdentifySeries'), 'err');
-    return;
-  }
-
-  const m = await send({ type: 'GET_MAPPING', mapKey: currentEpisode.mapKey });
-  if (m.ok && m.mapping?.animeId) {
-    selectTarget({
-      id: m.mapping.animeId,
-      title: m.mapping.title,
-      total: m.mapping.numEpisodes || 0,
-      picture: m.mapping.picture || '',
-      banner: m.mapping.banner || '',
-      url: m.mapping.url,
-    });
-  } else {
-    showPick();
-  }
-}
-
-function showPick() {
-  $('targetArea').classList.add('hidden');
-  $('pickArea').classList.remove('hidden');
-  const seed = cleanTitleGuess(currentEpisode.seriesTitle);
+  const seed = cleanTitleGuess(source.seriesTitle);
   $('searchQuery').value = seed;
   $('malUrl').value = '';
-  $('candidates').innerHTML = `<div class="muted">${tr('searching')}</div>`;
-  runSearch(seed);
+  runSearchState1(seed);
 }
 
-async function runSearch(query) {
+async function runSearchState1(query) {
   if (!query) return;
   $('candidates').innerHTML = `<div class="muted">${tr('searching')}</div>`;
-  const resp = await send({ type: 'SEARCH', query });
+  const resp = await send({ type: 'SEARCH_ANIME', query });
   if (!resp.ok) {
     $('candidates').innerHTML = `<div class="muted">${escapeHtml(resp.error || tr('errSearchFailed'))}</div>`;
     return;
   }
-  renderCandidates(resp.candidates);
+  renderCandidatesState1(resp.candidates);
 }
 
-function renderCandidates(list) {
+function renderCandidatesState1(list) {
   const box = $('candidates');
   box.innerHTML = '';
   if (!list || list.length === 0) {
-    box.innerHTML = `<div class="muted">${tr('noSearchResults', { provider: providerLabel })}</div>`;
+    box.innerHTML = `<div class="muted">${tr('noSearchResultsAnilist')}</div>`;
     return;
   }
   for (const c of list) {
@@ -275,285 +540,49 @@ function renderCandidates(list) {
     const btn = document.createElement('button');
     btn.className = 'mal';
     btn.textContent = tr('chooseBtn');
-    btn.onclick = () =>
-      selectTarget({
-        id: c.id,
-        title: c.title,
-        total: c.numEpisodes || 0,
-        picture: c.picture,
-        banner: c.banner,
-        url: c.url,
-      });
+    btn.onclick = () => onPickState1(c.id);
     div.appendChild(btn);
     box.appendChild(div);
   }
 }
 
-// Grava/atualiza o vínculo local source→provider pro episódio/série atual.
-function saveMapping(target) {
-  return send({
-    type: 'SAVE_MAPPING',
-    mapKey: currentEpisode.mapKey,
-    value: {
-      animeId: target.id,
-      title: target.title,
-      numEpisodes: target.total || 0,
-      picture: target.picture || '',
-      banner: target.banner || '',
-      crSeriesTitle: currentEpisode.seriesTitle,
-      site: currentEpisode.site,
-      savedAt: Date.now(),
-    },
-  });
-}
-
-// Alvo escolhido (via busca, URL, ou mapeamento existente).
-async function selectTarget(target) {
-  currentTarget = { ...target, currentWatched: null };
-  forceWrite = false;
-
-  if (remapOnly) {
-    // apenas troca o mapeamento, sem gravar episódio
-    await saveMapping(target);
-    setMsg(tr('mappedTo', { title: target.title }), 'ok');
-    openMappings();
-    return;
-  }
-
-  $('pickArea').classList.add('hidden');
-  $('targetArea').classList.remove('hidden');
-  $('regressWarn').classList.add('hidden');
-  $('saveBtn').textContent = tr('saveBtnLabel', { provider: providerLabel });
-  $('targetTitle').textContent = target.title;
-  const img = $('targetImg');
-  const bannerSrc = target.banner || target.picture || '';
-  if (bannerSrc) {
-    img.src = bannerSrc;
-  } else {
-    img.removeAttribute('src');
-  }
-  $('epNum').value = String(currentEpisode.episodeNumber ?? '');
-  $('targetProgress').textContent = tr('readingProgress', { provider: providerLabel });
-
-  const ls = await send({ type: 'GET_LIST_STATUS', animeId: target.id });
-  if (ls.ok) {
-    currentTarget.currentWatched = ls.listStatus.numWatched;
-    currentTarget.inList = ls.listStatus.inList;
-    currentTarget.status = ls.listStatus.status;
-    currentTarget.startDate = ls.listStatus.startDate || '';
-    currentTarget.finishDate = ls.listStatus.finishDate || '';
-    if (!currentTarget.total && ls.listStatus.numEpisodes)
-      currentTarget.total = ls.listStatus.numEpisodes;
-    renderProgress();
-    updateRegressWarn();
-  } else {
-    $('targetProgress').textContent = tr('errCouldNotReadProgress');
-  }
-}
-
-function updateRegressWarn() {
-  const num = parseInt($('epNum').value, 10);
-  const cur = currentTarget?.currentWatched;
-  const w = $('regressWarn');
-  if (Number.isFinite(num) && cur != null && num < cur) {
-    w.textContent = tr('regressWarning', { cur, num, provider: providerLabel });
-    w.classList.remove('hidden');
-    if (!forceWrite) $('saveBtn').textContent = tr('saveBtnForce');
-  } else {
-    w.classList.add('hidden');
-    if (!forceWrite) $('saveBtn').textContent = tr('saveBtnLabel', { provider: providerLabel });
-  }
-}
-
-// Datas automáticas (só preenche se estiver vazio; nunca sobrescreve):
-// - início = hoje quando o provider está em 0 e você grava um nº > 0 (robusto à numeração da source)
-// - fim = hoje quando completa a temporada (nº >= total) ou ao finalizar explicitamente
-function computeDates(num, completed) {
-  const dates = {};
-  if (!currentTarget.startDate && (currentTarget.currentWatched || 0) === 0 && num >= 1) {
-    dates.start_date = todayStr();
-  }
-  const willComplete = completed || (currentTarget.total > 0 && num >= currentTarget.total);
-  if (willComplete && !currentTarget.finishDate) {
-    dates.finish_date = todayStr();
-  }
-  return dates;
-}
-
-// Grava no provider ativo (usado por "Gravar" e "Finalizar"). completed força status completed.
-async function writeToMal(num, completed) {
-  const dates = computeDates(num, completed);
-  setMsg(completed ? tr('finishingMsg') : tr('savingMsg'));
+// Grava direto na lista real — PLANNING se veio da página do anime (nunca
+// tem episódio pra capturar progresso de verdade), CURRENT + episódio
+// detectado se veio da página de episódio, indo direto pra tela do estado 4
+// depois (sem passo extra — ver docs/1.0.0/design.md § "Anime ainda não
+// está em nenhuma lista, na página de episódio (estado 1)").
+async function onPickState1(mediaId) {
+  setMsg(tr('savingMsg'));
+  const fromEpisode = state1Source.episodeNumber != null;
   const resp = await send({
-    type: 'UPDATE_EPISODES',
-    animeId: currentTarget.id,
-    num,
-    total: currentTarget.total || 0,
-    dates,
-    completed,
+    type: 'SAVE_ENTRY',
+    mediaId,
+    status: fromEpisode ? 'CURRENT' : 'PLANNING',
+    progress: fromEpisode ? state1Source.episodeNumber : undefined,
   });
   if (!resp.ok) {
     setMsg(resp.error || tr('errFailedToSave'), 'err');
     return;
   }
-  // upsert do mapeamento (garante que fica salvo)
-  await saveMapping(currentTarget);
-  currentTarget.currentWatched = num;
-  currentTarget.inList = true;
-  currentTarget.status =
-    completed || (currentTarget.total > 0 && num >= currentTarget.total)
-      ? 'completed'
-      : 'watching';
-  if (dates.start_date) currentTarget.startDate = dates.start_date;
-  if (dates.finish_date) currentTarget.finishDate = dates.finish_date;
-  forceWrite = false;
-  updateRegressWarn();
-  renderProgress();
-  const extras = [];
-  if (dates.start_date) extras.push(tr('startedTodayTag'));
-  if (dates.finish_date) extras.push(tr('finishedTodayTag'));
-  if (currentTarget.status === 'completed') extras.push(tr('completedTag'));
-  const suffix = extras.length ? ' · ' + extras.join(' · ') : '';
-  setMsg(tr('savedMsg', { title: currentTarget.title, num, suffix }), 'ok');
+  setMsg(tr('detailSavedMsg'), 'ok');
+  if (fromEpisode) showQuick(resp.entry, state1Source);
+  else showDetail(resp.entry, { fromPanel: false });
 }
 
-async function onSave() {
-  const num = parseInt($('epNum').value, 10);
-  if (!Number.isFinite(num) || num < 0) {
-    setMsg(tr('errInvalidEpisodeNumber'), 'err');
+async function onUseUrlState1() {
+  const id = parseAnimeId($('malUrl').value);
+  if (!id) {
+    setMsg(tr('errInvalidAnilistUrl'), 'err');
     return;
   }
-  const cur = currentTarget.currentWatched;
-  if (!forceWrite && cur != null && num < cur) {
-    // primeira tentativa de reduzir: exige segundo clique
-    forceWrite = true;
-    updateRegressWarn();
-    setMsg(tr('confirmReduceMsg'), '');
+  setMsg(tr('searchingAnime'));
+  const resp = await send({ type: 'GET_ANIME_BY_ID', animeId: id });
+  if (!resp.ok) {
+    setMsg(resp.error || tr('errAnimeNotFound'), 'err');
     return;
   }
-  await writeToMal(num, false);
-}
-
-// Finaliza a temporada: marca completed + fim = hoje. Usa o total se conhecido.
-async function onComplete() {
-  let num = parseInt($('epNum').value, 10);
-  if (currentTarget.total) {
-    num = currentTarget.total;
-    $('epNum').value = String(num);
-  }
-  if (!Number.isFinite(num) || num < 0) {
-    setMsg(tr('errInvalidEpisodeNumberComplete'), 'err');
-    return;
-  }
-  await writeToMal(num, true);
-}
-
-// "Plan to watch": grava o vínculo local sem gravar episódio. Se o anime ainda
-// não está em nenhuma lista do provider, também marca status "plan to watch"
-// lá (0 episódios) — se já está (watching, completed, etc.), não mexe no status.
-async function onPlanToWatch() {
-  if (!currentTarget.inList) {
-    setMsg(tr('savingMsg'));
-    const resp = await send({ type: 'PLAN_TO_WATCH', animeId: currentTarget.id });
-    if (!resp.ok) {
-      setMsg(resp.error || tr('errFailedToSave'), 'err');
-      return;
-    }
-  }
-  await saveMapping(currentTarget);
-  setMsg(tr('mappedTo', { title: currentTarget.title }), 'ok');
-  openMappings();
-}
-
-// ---------- GESTÃO DE MAPEAMENTOS ----------
-
-// Mapeamentos salvos antes do suporte a múltiplos sites não têm `site` gravado —
-// nesse caso só existia Crunchyroll, então cai no fallback pelo formato da chave.
-function siteOf(key, val) {
-  return val?.site || (key.startsWith('pv:') ? 'pv' : 'cr');
-}
-const SITE_LABEL = { cr: 'CR', pv: 'PV' };
-
-// Reconstrói a URL da série/detail na plataforma de origem a partir do mapKey
-// (CR: "{crSeriesId}#S{n}" → /series/{id}; PV: "pv:{detailId}" → /detail/{id}).
-function siteUrl(key, val) {
-  const site = siteOf(key, val);
-  if (site === 'pv') {
-    const id = key.startsWith('pv:') ? key.slice(3) : '';
-    return id ? `https://www.primevideo.com/detail/${id}` : null;
-  }
-  const id = key.split('#')[0];
-  return id ? `https://www.crunchyroll.com/series/${id}` : null;
-}
-
-async function openMappings() {
-  const resp = await send({ type: 'GET_ALL_MAPPINGS' });
-  const list = $('mappingsList');
-  list.innerHTML = '';
-  const entries = Object.entries((resp.ok && resp.mappings) || {});
-  if (entries.length === 0) {
-    list.innerHTML = `<div class="muted">${tr('noMappingsYet')}</div>`;
-  }
-  for (const [key, val] of entries) {
-    const site = siteOf(key, val);
-    const row = document.createElement('div');
-    row.className = 'mapcard';
-    const bannerSrc = val.banner || val.picture || '';
-    row.innerHTML = `
-      ${bannerSrc ? `<img class="banner" src="${escapeHtml(bannerSrc)}" alt="">` : '<div class="banner"></div>'}
-      <div class="info">
-        <div class="v">${escapeHtml(val.title || '?')}</div>
-        <div class="subline">
-          <div class="k">${escapeHtml(key)}</div>
-          <div class="ep">${val.numEpisodes ? val.numEpisodes + ' ep' : ''}</div>
-        </div>
-      </div>`;
-    const actions = document.createElement('div');
-    actions.className = 'actions';
-    const url = siteUrl(key, val);
-    const openSrc = document.createElement('button');
-    openSrc.className = `src ${site}`;
-    openSrc.textContent = `${SITE_LABEL[site]} ↗`;
-    openSrc.disabled = !url;
-    openSrc.onclick = () => openUrl(url);
-    const open = document.createElement('button');
-    open.className = 'mal';
-    open.textContent = `${providerLabel} ↗`;
-    open.onclick = () => openUrl(val.url);
-    const remap = document.createElement('button');
-    remap.className = 'ghost';
-    remap.textContent = tr('remapBtn');
-    remap.onclick = () => startRemap(key, val);
-    const del = document.createElement('button');
-    del.className = 'danger';
-    del.textContent = tr('deleteBtn');
-    del.onclick = async () => {
-      await send({ type: 'REMOVE_MAPPING', mapKey: key });
-      openMappings();
-    };
-    actions.appendChild(openSrc);
-    actions.appendChild(open);
-    actions.appendChild(remap);
-    actions.appendChild(del);
-    row.appendChild(actions);
-    list.appendChild(row);
-  }
-  showCard('mappingsCard');
-}
-
-// Re-mapear pela tela de gestão: reusa o pick, mas só troca o alvo (não grava episódio).
-function startRemap(mapKey, val) {
-  currentEpisode = {
-    mapKey,
-    seriesTitle: val.crSeriesTitle || val.title || '',
-    site: siteOf(mapKey, val),
-  };
-  remapOnly = true;
-  $('epTitle').textContent = tr('remapTitle');
-  $('epMeta').textContent = mapKey;
-  $('targetArea').classList.add('hidden');
-  showCard('mainCard');
-  showPick();
+  setMsg('');
+  await onPickState1(resp.anime.id);
 }
 
 // ---------- render inicial ----------
@@ -564,24 +593,24 @@ async function render() {
     setMsg(s.error || tr('errCouldNotGetStatus'), 'err');
     return;
   }
-  providerId = s.providerId || providerId;
-  providerLabel = s.providerLabel || providerLabel;
   $('statusDot').classList.toggle('on', !!s.loggedIn);
   if (!s.clientId || !s.loggedIn) {
     await showSetup(s);
     return;
   }
-  applyProviderLabels();
-  await showEpisode();
+
+  const state = await send({ type: 'GET_STATE' });
+  if (!state.ok) {
+    setMsg(state.error || tr('errCouldNotGetStatus'), 'err');
+    return;
+  }
+  if (state.state === 2) return showPanel();
+  if (state.state === 3) return showDetail(state.entry, { fromPanel: false });
+  if (state.state === 4) return showQuick(state.entry, state.source);
+  return showSearchState1(state.source);
 }
 
 // ---------- listeners ----------
-
-$('providerSelect').onchange = async () => {
-  await send({ type: 'SET_ACTIVE_PROVIDER', providerId: $('providerSelect').value });
-  const s = await send({ type: 'GET_STATUS' });
-  await showSetup(s);
-};
 
 $('openSettings').onclick = async () => {
   const s = await send({ type: 'GET_STATUS' });
@@ -589,14 +618,12 @@ $('openSettings').onclick = async () => {
 };
 
 $('saveCreds').onclick = async () => {
-  const r1 = await send({ type: 'SET_CLIENT_ID', clientId: $('clientId').value });
-  const r2 = await send({ type: 'SET_CLIENT_SECRET', clientSecret: $('clientSecret').value });
-  const ok = r1.ok && r2.ok;
-  setMsg(ok ? tr('credsSaved') : r1.error || r2.error, ok ? 'ok' : 'err');
+  const resp = await send({ type: 'SET_CLIENT_ID', clientId: $('clientId').value });
+  setMsg(resp.ok ? tr('credsSaved') : resp.error, resp.ok ? 'ok' : 'err');
 };
 
 $('loginBtn').onclick = async () => {
-  setMsg(tr('openingLogin', { provider: providerLabel }));
+  setMsg(tr('openingLogin', { provider: 'AniList' }));
   const resp = await send({ type: 'LOGIN' });
   if (resp.ok) {
     setMsg(tr('authenticated'), 'ok');
@@ -606,52 +633,31 @@ $('loginBtn').onclick = async () => {
   }
 };
 
-$('searchBtn').onclick = () => runSearch($('searchQuery').value.trim());
+$('searchBtn').onclick = () => runSearchState1($('searchQuery').value.trim());
 $('searchQuery').addEventListener('keydown', (e) => {
-  if (e.key === 'Enter') runSearch($('searchQuery').value.trim());
+  if (e.key === 'Enter') runSearchState1($('searchQuery').value.trim());
 });
+$('useUrlBtn').onclick = onUseUrlState1;
 
-$('useUrlBtn').onclick = async () => {
-  const id = parseAnimeId($('malUrl').value);
-  if (!id) {
-    setMsg(tr('errInvalidMalUrl', { provider: providerLabel }), 'err');
-    return;
-  }
-  setMsg(tr('searchingAnime'));
-  const resp = await send({ type: 'GET_ANIME', animeId: id });
-  if (resp.ok) {
-    setMsg('');
-    selectTarget({
-      id: resp.anime.id,
-      title: resp.anime.title,
-      total: resp.anime.numEpisodes || 0,
-      picture: resp.anime.picture,
-      banner: resp.anime.banner,
-      url: resp.anime.url,
-    });
-  } else {
-    setMsg(resp.error || tr('errAnimeNotFound'), 'err');
-  }
+$('tabWatching').onclick = () => {
+  panelTab = 'watching';
+  renderPanelTab();
 };
+$('tabPlanning').onclick = () => {
+  panelTab = 'planning';
+  renderPanelTab();
+};
+$('resyncBtn').onclick = onResync;
 
-$('epNum').addEventListener('input', () => {
-  forceWrite = false;
-  updateRegressWarn();
-});
-$('saveBtn').onclick = onSave;
-$('completeBtn').onclick = onComplete;
-$('planToWatchBtn').onclick = onPlanToWatch;
-$('openMal').onclick = () => openUrl(currentTarget?.url);
-$('remapLink').onclick = () => {
-  remapOnly = false;
-  showPick();
-};
-$('showMappings').onclick = openMappings;
-$('nw_showMappings').onclick = openMappings;
-$('nw_setup').onclick = async () => {
-  const s = await send({ type: 'GET_STATUS' });
-  showSetup(s);
-};
-$('backFromMappings').onclick = () => render();
+$('detailBack').onclick = () => showPanel();
+$('detailProgress').addEventListener('input', resetDetailConfirm);
+$('detailSaveBtn').onclick = () => onDetailAction('save');
+$('detailPlanBtn').onclick = () => onDetailAction('plan');
+$('detailPauseBtn').onclick = () => onDetailStatusOnly('pause', 'PAUSED', 'detailConfirmPause');
+$('detailDropBtn').onclick = () => onDetailStatusOnly('drop', 'DROPPED', 'detailConfirmDrop');
+
+$('quickEpNum').addEventListener('input', resetQuickConfirm);
+$('quickSaveBtn').onclick = onQuickSave;
+$('quickDetailsBtn').onclick = () => showDetail(quickEntry, { fromPanel: false });
 
 render();

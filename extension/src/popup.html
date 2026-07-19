@@ -10,7 +10,7 @@
         --fg: #e8e8ea;
         --muted: #9a9aa2;
         --accent: #f47521; /* laranja Crunchyroll */
-        --accent2: #2e51a2; /* azul do provider (MAL/AniList) */
+        --accent2: #2e51a2; /* azul AniList */
         --pv: #1399ff; /* azul Prime Video */
         --card: #26262b;
         --field: #16161a;
@@ -57,7 +57,9 @@
       .mal { background: var(--accent2); }
       .ghost { background: #3a3a42; }
       .danger { background: var(--err); }
-      .done { background: var(--ok); }
+      .details { background: #8957e5; }
+      .plan { background: #2ba9a1; }
+      .pause { background: var(--warn); }
       button:disabled { opacity: 0.5; cursor: default; }
       .wide { width: 100%; }
       .row { display: flex; gap: 6px; margin-top: 8px; align-items: center; }
@@ -105,9 +107,29 @@
       .mapcard .ep { font-size: 10px; color: var(--muted); flex: 0 0 auto; }
       .mapcard .actions { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
       .mapcard .actions > * { padding: 4px 9px; font-size: 11px; }
-      .mapcard .actions .src { min-width: 44px; text-align: center; }
-      .mapcard .actions .src.cr { background: var(--accent); }
-      .mapcard .actions .src.pv { background: var(--pv); }
+      .src { min-width: 44px; text-align: center; }
+      .src.cr { background: var(--accent); }
+      .src.pv { background: var(--pv); }
+      .tabs { display: flex; gap: 0; margin-bottom: 8px; border-bottom: 1px solid #33333a; }
+      .tabs button {
+        flex: 1;
+        background: transparent;
+        color: var(--muted);
+        border-radius: 0;
+        padding: 6px 8px 8px;
+        margin-bottom: -1px;
+        border-bottom: 2px solid transparent;
+      }
+      .tabs button.active {
+        color: var(--accent2);
+        background: #34343c;
+        border-radius: 6px 6px 0 0;
+        border-bottom-color: var(--accent2);
+        font-weight: 700;
+      }
+      .progressbar { height: 5px; border-radius: 3px; background: var(--field); margin-top: 6px; overflow: hidden; }
+      .progressbar .fill { height: 100%; background: var(--ok); }
+      .countdown { font-size: 10px; color: var(--warn); margin-top: 2px; }
       #msg { font-size: 11px; margin-top: 8px; min-height: 14px; }
       #msg.ok { color: var(--ok); }
       #msg.err { color: var(--err); }
@@ -120,6 +142,14 @@
       <span id="statusDot" class="dot"></span> Anime Watched
       <span class="grow"></span>
       <button
+        class="ghost hidden"
+        id="resyncBtn"
+        style="padding: 3px 7px; font-size: 12px"
+        data-i18n-title="resyncBtnTitle"
+      >
+        ⟳
+      </button>
+      <button
         class="ghost"
         id="openSettings"
         style="padding: 3px 7px; font-size: 12px"
@@ -129,43 +159,25 @@
       </button>
     </h1>
 
-    <!-- [1] SETUP -->
+    <!-- SETUP (login no AniList) -->
     <div class="card hidden" id="setupCard">
-      <label data-i18n="setupProviderLabel"></label>
-      <select id="providerSelect" class="wide"></select>
-      <label style="margin-top: 8px" id="redirectLabel"></label>
+      <label style="margin-top: 0" id="redirectLabel"></label>
       <div class="mono" id="redirectUri">—</div>
       <label style="margin-top: 8px" id="clientIdLabel_"></label>
       <input id="clientId" type="text" data-i18n-placeholder="setupClientIdPlaceholder" />
-      <div id="clientSecretField">
-        <label style="margin-top: 8px"
-          ><span data-i18n="setupClientSecretLabel"></span>
-          <span class="muted" data-i18n="setupClientSecretHint"></span
-        ></label>
-        <input id="clientSecret" type="text" data-i18n-placeholder="setupClientSecretPlaceholder" />
-      </div>
       <div class="row">
         <button class="ghost grow" id="saveCreds" data-i18n="setupSaveCredsBtn"></button>
         <button class="mal grow" id="loginBtn"></button>
       </div>
     </div>
 
-    <!-- [4] Fora de /watch/ -->
-    <div class="card hidden" id="nowatchCard">
-      <div class="muted" id="nowatchMsg"></div>
-      <div class="links">
-        <a id="nw_showMappings" data-i18n="linkShowMappings"></a> ·
-        <a id="nw_setup" data-i18n="linkSetup"></a>
-      </div>
-    </div>
-
-    <!-- [2]/[3] Episódio detectado -->
+    <!-- Estado 1 — busca (reaproveita HTML/CSS aqui; funções em popup.js
+         decidem se o alvo é PLANNING ou CURRENT+episódio, ver docs/1.0.0/visao.md) -->
     <div class="card hidden" id="mainCard">
       <div class="epline" id="epTitle">—</div>
       <div class="epsub" id="epMeta">—</div>
 
-      <!-- [3] Escolher anime no provider ativo (não mapeado) -->
-      <div class="hidden" id="pickArea">
+      <div id="pickArea">
         <div class="row tight">
           <input id="searchQuery" class="grow" type="text" />
           <button class="ghost" id="searchBtn" data-i18n="searchBtn"></button>
@@ -177,41 +189,69 @@
           <button class="ghost" id="useUrlBtn" data-i18n="useBtn"></button>
         </div>
       </div>
+    </div>
 
-      <!-- [2] Alvo escolhido/mapeado: confirmar e gravar -->
-      <div class="hidden" id="targetArea">
-        <div class="target">
-          <img id="targetImg" class="banner" alt="" />
-          <div class="meta">
-            <div class="v" id="targetTitle" style="font-weight: 600"></div>
-            <div class="epsub" id="targetProgress"></div>
-          </div>
+    <!-- Estado 2 — painel de lista (nenhuma página relevante) -->
+    <div class="card hidden" id="panelCard">
+      <div class="tabs">
+        <button id="tabWatching" class="active" data-i18n="panelTabWatching"></button>
+        <button id="tabPlanning" data-i18n="panelTabPlanning"></button>
+      </div>
+      <div class="muted" id="panelSyncInfo" style="margin-bottom: 6px"></div>
+      <div id="panelList"><div class="muted" data-i18n="panelLoading"></div></div>
+    </div>
+
+    <!-- Estado 3 — tela de detalhes (anime já numa lista, sem episódio) -->
+    <div class="card hidden" id="detailCard">
+      <button class="ghost hidden" id="detailBack" style="padding: 4px 8px; margin-bottom: 6px" data-i18n="backBtn"></button>
+      <div class="target">
+        <img id="detailImg" class="banner" alt="" />
+        <div class="meta">
+          <div class="v" id="detailTitle" style="font-weight: 600"></div>
+          <div class="epsub hidden" id="detailStatus"></div>
         </div>
-        <div class="row">
-          <label style="margin: 0" data-i18n="epNumLabel"></label>
-          <input id="epNum" class="ep" type="text" />
-        </div>
-        <div class="warn hidden" id="regressWarn"></div>
-        <div class="row" style="margin-top: 10px">
-          <button class="primary grow" id="saveBtn"></button>
-          <button class="done" id="completeBtn" data-i18n="completeBtnLabel" data-i18n-title="completeBtnTitle"></button>
-        </div>
-        <div class="btnrow">
-          <button class="ghost" id="planToWatchBtn" data-i18n="planToWatchBtnLabel"></button>
-          <button class="mal" id="openMal"></button>
-          <button class="ghost" id="remapLink" data-i18n="changeAnimeBtn"></button>
-          <button class="ghost" id="showMappings" data-i18n="viewMappingsBtn"></button>
-        </div>
+      </div>
+      <div class="row">
+        <label style="margin: 0" data-i18n="epNumLabel"></label>
+        <input id="detailProgress" class="ep" type="text" />
+        <span class="muted" id="detailTotal"></span>
+      </div>
+      <div class="countdown hidden" id="detailCountdown"></div>
+      <div class="warn hidden" id="detailWarn"></div>
+      <div class="row" style="margin-top: 10px">
+        <button class="primary grow" id="detailSaveBtn" data-i18n="detailSaveBtn"></button>
+      </div>
+      <div class="btnrow">
+        <button class="plan" id="detailPlanBtn" data-i18n="planToWatchBtnLabel"></button>
+        <button class="pause" id="detailPauseBtn" data-i18n="pauseBtn"></button>
+        <button class="danger" id="detailDropBtn" data-i18n="dropBtn"></button>
+      </div>
+      <div class="btnrow">
+        <button class="mal" id="detailAnilistBtn">AniList ↗</button>
+        <button class="ghost hidden" id="detailSourceBtn"></button>
       </div>
     </div>
 
-    <!-- [5] Gestão de mapeamentos -->
-    <div class="card hidden" id="mappingsCard">
-      <div class="row" style="margin: 0 0 6px; justify-content: space-between">
-        <strong style="font-size: 12px" data-i18n="mappingsTitle"></strong>
-        <button class="ghost" id="backFromMappings" style="padding: 4px 8px" data-i18n="backBtn"></button>
+    <!-- Estado 4 — tela rápida (página de episódio, anime já reconhecido) -->
+    <div class="card hidden" id="quickCard">
+      <div class="target">
+        <img id="quickImg" class="banner" alt="" />
+        <div class="meta">
+          <div class="v" id="quickTitle" style="font-weight: 600"></div>
+          <div class="epsub" id="quickMeta"></div>
+          <div class="epsub hidden" id="quickStatus"></div>
+        </div>
       </div>
-      <div id="mappingsList"><div class="muted" data-i18n="noMappingsYet"></div></div>
+      <div class="row">
+        <label style="margin: 0" data-i18n="epNumLabel"></label>
+        <input id="quickEpNum" class="ep" type="text" />
+        <span class="muted" id="quickTotal"></span>
+      </div>
+      <div class="warn hidden" id="quickWarn"></div>
+      <div class="row" style="margin-top: 10px">
+        <button class="primary grow" id="quickSaveBtn" data-i18n="detailSaveBtn"></button>
+        <button class="details" id="quickDetailsBtn" data-i18n="viewDetailsBtn"></button>
+      </div>
     </div>
 
     <div id="msg"></div>

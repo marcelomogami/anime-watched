@@ -1,23 +1,9 @@
-// store.js — wrapper de chrome.storage
-// - config (clientId/secret) e tokens: namespaced por provider, chrome.storage.local
-// - provider ativo: chrome.storage.local
-// - mapa source→provider: chrome.storage.sync (sincroniza entre máquinas), fallback local
-//   cada entrada guarda um alvo por provider (`providers: { mal: {...}, anilist: {...} }`),
-//   pra não perder o vínculo com um provider ao trocar o provider ativo pra outro.
+// store.js — wrapper de chrome.storage. Tudo em chrome.storage.local desde
+// o v1.0.0 (AniList é o único backend, sem mapa source→provider — a lista
+// real do AniList é a fonte de verdade, ver docs/1.0.0/contexto.md). Não usa
+// mais chrome.storage.sync pra nada.
 
-const ACTIVE_PROVIDER_KEY = 'active_provider';
-const DEFAULT_PROVIDER = 'mal';
-
-const AUTH_PREFIX = 'auth/'; // chave: "auth/mal/client_id"
-const MAP_PREFIX = 'map:'; // chave: "map:GT00371630#S1"
-
-// Chaves antigas (pré-namespacing), só existiram pro MAL. Migradas por
-// self-heal na primeira leitura de cada uma — ver `readAuthValue` abaixo.
-const LEGACY_LOCAL_KEYS = {
-  client_id: 'mal_client_id',
-  client_secret: 'mal_client_secret',
-  tokens: 'mal_tokens',
-};
+const AUTH_PREFIX = 'auth/'; // chave: "auth/anilist/client_id"
 
 function localGet(key) {
   return new Promise((resolve) =>
@@ -31,98 +17,40 @@ function localRemove(key) {
   return new Promise((resolve) => chrome.storage.local.remove(key, resolve));
 }
 
-// storage.sync com fallback para local se indisponível/quota
-function syncArea() {
-  return chrome.storage.sync || chrome.storage.local;
-}
-function syncGet(key) {
-  return new Promise((resolve) =>
-    syncArea().get(key, (r) => resolve(r[key])),
+// Fallback por título (romaji/english/synonyms, comparação exata sem fuzzy)
+// usado quando o casamento por ID falha — tanto por link desatualizado no
+// AniList (CR) quanto por falta de índice ainda (PV), ver
+// `resolveEntryForSource` abaixo.
+function findByTitle(cache, seriesTitle) {
+  if (!seriesTitle) return null;
+  const normalized = seriesTitle.trim().toLowerCase();
+  return (
+    cache.entries.find((entry) => {
+      const t = entry.media?.title || {};
+      const synonyms = entry.media?.synonyms || [];
+      return (
+        t.romaji?.trim().toLowerCase() === normalized ||
+        t.english?.trim().toLowerCase() === normalized ||
+        synonyms.some((s) => s.trim().toLowerCase() === normalized)
+      );
+    }) || null
   );
-}
-function syncSet(obj) {
-  return new Promise((resolve, reject) =>
-    syncArea().set(obj, () => {
-      if (chrome.runtime.lastError) {
-        // fallback pro local se sync falhar (ex.: quota, sync desativado)
-        chrome.storage.local.set(obj, resolve);
-      } else {
-        resolve();
-      }
-    }),
-  );
-}
-
-// Converte uma entrada de mapeamento do formato antigo (pré-providers, campos
-// `malAnimeId`/`malTitle`/`malNumEpisodes` soltos) pro formato novo
-// (`providers: { mal: { animeId, title, numEpisodes } }`). Entradas que já
-// estão no formato novo passam direto.
-function migrateMappingShape(raw) {
-  if (!raw) return null;
-  if (raw.providers) return raw;
-  if (raw.malAnimeId === undefined) return raw; // formato desconhecido: não mexe
-  const { malAnimeId, malTitle, malNumEpisodes, ...common } = raw;
-  return {
-    ...common,
-    providers: {
-      mal: {
-        animeId: malAnimeId,
-        title: malTitle,
-        numEpisodes: malNumEpisodes || 0,
-      },
-    },
-  };
-}
-
-// Lê uma chave de auth namespaced; se estiver vazia e existir uma chave
-// legada equivalente (só possível pro provider 'mal'), migra o valor pra
-// chave nova, apaga a antiga e retorna o valor migrado. Self-heal, mesmo
-// espírito da migração de mapeamentos.
-async function readAuthValue(providerId, suffix) {
-  const key = `${AUTH_PREFIX}${providerId}/${suffix}`;
-  const val = await localGet(key);
-  if (val !== undefined) return val;
-
-  const legacyKey = providerId === 'mal' ? LEGACY_LOCAL_KEYS[suffix] : undefined;
-  if (!legacyKey) return undefined;
-  const legacyVal = await localGet(legacyKey);
-  if (legacyVal === undefined) return undefined;
-
-  await localSet({ [key]: legacyVal });
-  await localRemove(legacyKey);
-  return legacyVal;
 }
 
 export const store = {
-  // --- provider ativo ---
-  async getActiveProvider() {
-    return (await localGet(ACTIVE_PROVIDER_KEY)) || DEFAULT_PROVIDER;
-  },
-  async setActiveProvider(providerId) {
-    return localSet({ [ACTIVE_PROVIDER_KEY]: providerId });
-  },
-
   // --- auth (namespaced por provider) ---
   async getClientId(providerId) {
-    return (await readAuthValue(providerId, 'client_id')) || '';
+    return (await localGet(`${AUTH_PREFIX}${providerId}/client_id`)) || '';
   },
   async setClientId(providerId, id) {
     return localSet({
       [`${AUTH_PREFIX}${providerId}/client_id`]: (id || '').trim(),
     });
   },
-  async getClientSecret(providerId) {
-    return (await readAuthValue(providerId, 'client_secret')) || '';
-  },
-  async setClientSecret(providerId, secret) {
-    return localSet({
-      [`${AUTH_PREFIX}${providerId}/client_secret`]: (secret || '').trim(),
-    });
-  },
 
   // --- tokens (namespaced por provider) ---
   async getTokens(providerId) {
-    return (await readAuthValue(providerId, 'tokens')) || null;
+    return (await localGet(`${AUTH_PREFIX}${providerId}/tokens`)) || null;
   },
   async setTokens(providerId, tokens) {
     return localSet({ [`${AUTH_PREFIX}${providerId}/tokens`]: tokens });
@@ -131,55 +59,106 @@ export const store = {
     return localRemove(`${AUTH_PREFIX}${providerId}/tokens`);
   },
 
-  // --- mapa source→provider ---
-
-  // Retorna a entrada inteira (metadados comuns + alvo por provider já
-  // migrado), ou null se não existe.
-  async getMappingEntry(key) {
-    const raw = await syncGet(MAP_PREFIX + key);
-    const migrated = migrateMappingShape(raw);
-    if (migrated && migrated !== raw) {
-      // self-heal: persiste o formato novo já na primeira leitura
-      await syncSet({ [MAP_PREFIX + key]: migrated });
-    }
-    return migrated;
+  // --- id numérico do usuário autenticado (namespaced por provider) ---
+  // Cacheado depois do primeiro `Viewer { id }` — evita repetir essa query
+  // toda vez que `getListCache()` precisa montar `MediaListCollection(userId: ...)`.
+  async getViewerId(providerId) {
+    return (await localGet(`${AUTH_PREFIX}${providerId}/viewer_id`)) || null;
+  },
+  async setViewerId(providerId, viewerId) {
+    return localSet({ [`${AUTH_PREFIX}${providerId}/viewer_id`]: viewerId });
   },
 
-  // Mescla `value` (shape { animeId, title, numEpisodes }) dentro de
-  // `providers[providerId]` da entrada, preservando outros providers e os
-  // metadados comuns já salvos (ex.: crSeriesTitle, site).
-  async setMappingProvider(key, providerId, value, commonFields = {}) {
-    const existing = (await store.getMappingEntry(key)) || { providers: {} };
-    const entry = {
-      ...existing,
-      ...commonFields,
-      providers: {
-        ...existing.providers,
-        [providerId]: value,
-      },
+  // --- cache local da MediaListCollection (v1.0.0) ---
+  // { entries: [...], fetchedAt } em chrome.storage.local — não .sync, lista
+  // completa (506 entradas reais confirmadas, ~470 KB) estoura de longe os
+  // 100 KB de quota do .sync (ver docs/1.0.0/design.md § "Cache local").
+  // `fetchedAt` só é tocado por um re-sync completo (setListCache) — updates
+  // otimistas de uma entrada só (patchListCacheEntry) não mexem nele, de
+  // propósito.
+  async getListCache() {
+    return (await localGet('anilist/listCache')) || null;
+  },
+  async setListCache(entries) {
+    return localSet({
+      'anilist/listCache': { entries, fetchedAt: Date.now() },
+    });
+  },
+  // Substitui (ou adiciona) uma entrada só no cache já existente, sem tocar
+  // em `fetchedAt` — usado depois de um save otimista (ver
+  // docs/1.0.0/design.md § "Adicionar/atualizar entrada no cache local,
+  // numa chamada só"). Casa pelo `id` da entrada (id da lista, não do anime);
+  // se não achar nenhuma com esse id, adiciona como nova.
+  async patchListCacheEntry(entry) {
+    const cache = (await localGet('anilist/listCache')) || {
+      entries: [],
+      fetchedAt: 0,
     };
-    return syncSet({ [MAP_PREFIX + key]: entry });
+    const idx = cache.entries.findIndex((e) => e.id === entry.id);
+    if (idx === -1) cache.entries.push(entry);
+    else cache.entries[idx] = entry;
+    return localSet({ 'anilist/listCache': cache });
   },
 
-  async getAllMappingEntries() {
-    return new Promise((resolve) =>
-      syncArea().get(null, async (all) => {
-        const out = {};
-        for (const [k, v] of Object.entries(all)) {
-          if (k.startsWith(MAP_PREFIX)) {
-            const migrated = migrateMappingShape(v);
-            out[k.slice(MAP_PREFIX.length)] = migrated;
-            if (migrated !== v) {
-              await syncSet({ [k]: migrated }); // self-heal
-            }
-          }
-        }
-        resolve(out);
-      }),
-    );
+  // --- índice pvDetailId -> mediaId (só Prime Video) ---
+  // Não é um mapeamento de dados (não guarda título/progresso/nada disso —
+  // isso sempre vem do cache real acima). É só uma tradução de ID: o AniList
+  // registra o Prime Video em `externalLinks` pelo ASIN da Amazon
+  // (`amazon.com/dp/B07WT8T6KK`), que **não é o mesmo identificador** que o
+  // `pvDetailId` extraído da URL da página
+  // (`primevideo.com/detail/0GZCWV7IOJ8M9624JD5A4HA66B`) — confirmado com
+  // dado real desta sessão, são sistemas de ID desconectados. Sem essa
+  // tradução, dava pra casar por título (fallback em `resolveEntryForSource`
+  // abaixo), mas uma vez resolvido — pelo usuário, no estado 1 (busca) — o
+  // resultado fica salvo aqui pra não precisar buscar de novo. Existe só
+  // porque o Crunchyroll não tem esse problema (o `crSeriesId` aparece
+  // direto na URL do `externalLinks`, sem tradução nenhuma).
+  async getPvMediaId(pvDetailId) {
+    const map = (await localGet('pv/idMap')) || {};
+    return map[pvDetailId] || null;
+  },
+  async setPvMediaId(pvDetailId, mediaId) {
+    const map = (await localGet('pv/idMap')) || {};
+    map[pvDetailId] = mediaId;
+    return localSet({ 'pv/idMap': map });
   },
 
-  async removeMapping(key) {
-    return new Promise((resolve) => syncArea().remove(MAP_PREFIX + key, resolve));
+  // Resolve se a aba atual (source + id extraído da página) já está em
+  // alguma lista, usando só o cache local — sem query nova. Ver
+  // docs/1.0.0/design.md § "Resolver aba atual → estado do popup".
+  //   - Crunchyroll: casa `sourceId` (crSeriesId) direto contra a URL de
+  //     `externalLinks` — confirmado com dado real (.../series/GT00371630/...).
+  //     Nem todo link do AniList foi migrado pro formato novo do CR, porém:
+  //     achado real (2026-07-18) mostrou 202 de 326 entradas com link de CR
+  //     ainda no formato antigo (`crunchyroll.com/<slug>`, sem `/series/<id>/`,
+  //     era pré-2018), que nunca bate por ID — cai no mesmo fallback por
+  //     título do PV abaixo.
+  //   - Prime Video: `sourceId` (pvDetailId) não bate com o ASIN do
+  //     `externalLinks` (ver `getPvMediaId` acima) — tenta o índice primeiro;
+  //     sem índice ainda, cai pro fallback por título (best-effort, sem
+  //     garantia — compara romaji/english/synonyms exato, sem fuzzy).
+  async resolveEntryForSource({ site, sourceId, seriesTitle }) {
+    const cache = await store.getListCache();
+    if (!cache) return null;
+
+    if (site === 'cr') {
+      const byId = cache.entries.find((entry) =>
+        (entry.media?.externalLinks || []).some(
+          (link) => link.type === 'STREAMING' && link.url.includes(sourceId),
+        ),
+      );
+      return byId || findByTitle(cache, seriesTitle);
+    }
+
+    if (site === 'pv') {
+      const mediaId = await store.getPvMediaId(sourceId);
+      if (mediaId) {
+        const byId = cache.entries.find((entry) => entry.media?.id === mediaId);
+        if (byId) return byId;
+      }
+      return findByTitle(cache, seriesTitle);
+    }
+
+    return null;
   },
 };

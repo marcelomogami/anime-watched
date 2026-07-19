@@ -3,25 +3,29 @@
 *[Read this in English](README.md)*
 
 Extensão de Chrome (Manifest V3) que grava, com um clique, o episódio que você acabou de
-ver no **Crunchyroll** ou no **Prime Video** na sua lista de anime — no **MyAnimeList
-(MAL)** ou no **AniList**, o que você escolher como provider ativo.
+ver no **Crunchyroll** ou no **Prime Video** direto na sua lista real do **AniList** — sem
+mapeamento manual, sem backend de tracking separado pra configurar.
 
-Sem servidor, sem backend: OAuth, chamadas à API do provider e o mapa de mapeamentos vivem
-inteiros dentro da extensão (`chrome.storage`).
+Sem servidor, sem backend: OAuth e as chamadas à API do AniList vivem inteiras dentro da
+extensão (`chrome.storage`). Suas listas Watching/Plan to Watch do AniList *são* o dado — a
+extensão só lê e grava nelas direto.
 
 Interface disponível em **pt-BR** e **en** (o Chrome escolhe pelo idioma do navegador).
 
 ## Screenshots
 
-| Episódio detectado → gravar | Buscar/escolher no provider | Gestão de mapeamentos |
+*(capturas em inglês — a interface em português tem o mesmo layout, só com os textos
+traduzidos)*
+
+| Sua lista, de relance | Detalhes do anime — gravar, pausar, dropar | Anime novo? Só buscar |
 |---|---|---|
-| ![Popup com episódio detectado e anime já mapeado](screenshots/popup-main.png) | ![Popup com resultados de busca](screenshots/popup-search.png) | ![Tela de gestão de mapeamentos salvos](screenshots/popup-mappings.png) |
+| ![Popup mostrando a lista Watching, com barra de progresso e contagem regressiva](screenshots/popup-panel-en.png) | ![Popup mostrando a tela de detalhes de um anime, com progresso, status e botões de ação](screenshots/popup-detail-en.png) | ![Popup mostrando resultados de busca do AniList pra um anime novo](screenshots/popup-search-en.png) |
 
 ## Como funciona
 
-São duas escolhas independentes que se juntam aqui: a **source** — Crunchyroll ou Prime
-Video, detectada automaticamente pela aba em que você está — e o **provider** — MAL ou
-AniList, escolhido por você — é onde o progresso de fato fica registrado.
+O popup é uma pequena máquina de estados que reage à aba ativa, e sempre lê e grava direto
+nas suas **listas reais do AniList** — não existe tabela de mapeamento local fazendo esse
+papel.
 
 1. **Extração (por source):**
    - **Crunchyroll:** numa página de episódio (`/watch/...`), lê do JSON-LD da página qual
@@ -32,33 +36,29 @@ AniList, escolhido por você — é onde o progresso de fato fica registrado.
      do player. Na página de detalhe (`/detail/{id}`) — sem o player aberto — lê a
      temporada e o título dos metadados da página; o próprio ID de detalhe já é
      por-temporada.
-2. **Configurar o provider:** escolha MAL ou AniList na tela de configuração — um fica
-   ativo por vez, trocável a qualquer momento pelo botão **⚙** no cabeçalho. Cada um mantém
-   o próprio login.
-3. Você clica no ícone da extensão → o popup mostra o que foi detectado.
-4. **Primeira vez de cada temporada:** você casa a série com o anime certo no provider
-   ativo — busca automática por título (os sinônimos multilíngue do AniList lidam bem
-   melhor com os títulos traduzidos do Prime Video do que a busca simples do MAL), ou
-   colando a URL/ID do provider. Se aquela temporada já estava mapeada no *outro* provider,
-   a extensão tenta resolver sozinha via cross-reference `idMal` do AniList antes de pedir
-   pra buscar de novo.
-5. A partir daí, duas opções:
-   - **Gravar** — atualiza o número de episódios assistidos no provider (e **Finalizar**
-     pra fechar a temporada).
-   - **Para assistir** — salva o mapeamento sem gravar progresso nenhum. Se o anime ainda
-     não estiver em nenhuma lista, também marca status "para assistir" lá (0 episódios); se
-     já estiver numa lista, só o mapeamento local é salvo — o progresso existente nunca é
-     tocado. Útil pra guardar algo que você ainda não começou a assistir, direto da página
-     do próprio anime — sem que o Crunchyroll ou o Prime Video registrem o episódio como
-     "aberto".
-
-O mapeamento é guardado por **temporada**: no Crunchyroll, `crSeriesId#Stemporada` (ex.:
-`GT00371630#S1`); no Prime Video, `pv:<detailId>` (ex.: `pv:0GZCWV7IOJ8M9624JD5A4HA66B`) —
-cada temporada já tem o próprio `detail/<ID>` lá. Em ambos os casos resolve o caso comum de
-uma temporada ser uma entrada separada no provider. Cada mapeamento guarda um alvo **por
-provider**, então trocar o provider ativo nunca descarta um mapeamento que você já tinha —
-na pior das hipóteses, só precisa mapear aquela temporada de novo no provider novo (e o
-cross-reference acima costuma evitar até isso).
+2. **Casamento com suas listas:** a extensão mantém um cache local de toda a sua coleção do
+   AniList (Watching/Plan to Watch/etc. — `MediaListCollection`, atualizado sozinho a cada
+   ~1 semana ou sob demanda). O que é detectado na página é comparado contra esse cache —
+   principalmente pelo link de streaming que o AniList tem cadastrado pro anime
+   (`externalLinks`), com um fallback por título quando esse link está ausente ou
+   desatualizado (ver [Limitações conhecidas](#limitações-conhecidas)).
+3. Ao clicar no ícone da extensão, dependendo da página e se achou ou não uma
+   correspondência, uma de quatro telas aparece:
+   - **Nenhuma correspondência:** busca direto no AniList (por título, ou colando uma
+     URL/ID) e você escolhe o anime certo. Escolher a partir da página do anime/série
+     adiciona como **Para assistir** (0 episódios — essa página nunca tem um número de
+     episódio pra capturar progresso de verdade); escolher a partir da página de episódio já
+     grava como **Assistindo**, com o progresso daquele episódio.
+   - **Nenhuma página relevante aberta:** o **painel de lista** — abas Assistindo / Para
+     assistir, cada card mostrando progresso, contagem regressiva pro próximo episódio
+     quando ainda está no ar, e um badge de source que abre direto o Crunchyroll/Prime
+     Video.
+   - **Página do anime/série, já numa lista:** a **tela de detalhes** — progresso
+     (editável), Gravar, Para assistir, Pausar, Dropar, links pro AniList e pra plataforma
+     de origem.
+   - **Página de episódio, anime já reconhecido:** a **tela rápida** — o número do episódio
+     detectado, pronto pra gravar com um clique; um botão **Detalhes** leva pra tela
+     completa pra qualquer outra coisa (pausar, dropar, etc.).
 
 ## Instalação (unpacked)
 
@@ -68,37 +68,11 @@ cross-reference acima costuma evitar até isso).
 4. A extensão aparece na barra. Fixe o ícone se quiser.
 
 > O ID da extensão (e portanto o Redirect URI) é estável enquanto a pasta não mudar de
-> lugar. Se mover a pasta, o ID muda e o app de cada provider precisa do novo Redirect URI.
+> lugar. Se mover a pasta, o ID muda e o app do AniList precisa do novo Redirect URI.
 
-## Registrar o app no provider
+## Registrar o app no AniList
 
-Escolha MAL, AniList, ou os dois — a extensão só exige credenciais do provider que estiver
-ativo.
-
-### MyAnimeList
-
-1. Abra o popup da extensão, escolha **MAL** como provider, e copie o **Redirect URI**
-   mostrado (`https://<extension-id>.chromiumapp.org/`).
-2. Vá em [myanimelist.net/apiconfig](https://myanimelist.net/apiconfig) →
-   **Create ID**.
-3. Preencha:
-   - **App Type:** `web` — gera **Client ID** e **Client Secret** (o MAL exige o secret
-     na troca do token). Se escolher `other`, é cliente público e não há secret.
-   - **App Redirect URL:** cole o Redirect URI do passo 1
-   - **App Description:** mínimo de 50 caracteres, sem caracteres especiais
-   - Demais campos obrigatórios (nome, homepage, etc.): à vontade
-4. Salve e copie o **Client ID** (e o **Client Secret**, se for app `web`).
-5. No popup da extensão: cole o **Client ID** e o **Client Secret** → **Salvar
-   credenciais** → **Login no MAL** e autorize.
-
-O login usa OAuth2 com PKCE (método `plain`, exigência do MAL). O Client Secret (quando
-existe) é digitado por você e fica apenas no `chrome.storage.local` da sua máquina — nunca
-é embutido no código nem versionado.
-
-### AniList
-
-1. Abra o popup da extensão, escolha **AniList** como provider, e copie o **Redirect URI**
-   mostrado.
+1. Abra o popup da extensão e copie o **Redirect URI** mostrado na tela de login.
 2. Vá em [anilist.co/settings/developer](https://anilist.co/settings/developer) →
    **Create New Application**.
 3. Preencha um nome e cole o Redirect URI do passo 1.
@@ -112,18 +86,14 @@ quando expirar, é só logar de novo.
 
 ## Notas de segurança
 
-O `chrome.storage.local` — onde a autenticação fica (Client ID/Secret, tokens de
-acesso/refresh) — não é criptografado em disco; é LevelDB puro. Fica isolado de outras
-extensões e de qualquer site que você visite, mas não de qualquer coisa com acesso de
-leitura local ao seu perfil do Chrome (malware, outro usuário do sistema, etc.). É uma
-separação deliberada: só o mapa de mapeamentos sincroniza via `chrome.storage.sync` — ele
-não guarda nenhuma credencial, só as chaves de vínculo Crunchyroll/Prime Video ↔ provider.
+O `chrome.storage.local` — onde a autenticação (Client ID, token de acesso) e o cache
+local da lista ficam — não é criptografado em disco; é LevelDB puro. Fica isolado de
+outras extensões e de qualquer site que você visite, mas não de qualquer coisa com acesso
+de leitura local ao seu perfil do Chrome (malware, outro usuário do sistema, etc.).
 
-Se em algum momento suspeitar que um token vazou, revogue o acesso direto nas
-configurações do próprio provider —
-[myanimelist.net/apiconfig](https://myanimelist.net/apiconfig) pro MAL,
-[anilist.co/settings/developer](https://anilist.co/settings/developer) pro AniList — isso
-invalida na hora, sem precisar mexer na extensão.
+Se em algum momento suspeitar que um token vazou, revogue o acesso direto em
+[anilist.co/settings/developer](https://anilist.co/settings/developer) — isso invalida na
+hora, sem precisar mexer na extensão.
 
 ## Uso
 
@@ -131,48 +101,53 @@ invalida na hora, sem precisar mexer na extensão.
   (`/series/...`), se você só quiser guardar pra depois — e clique no ícone da extensão.
 - **Prime Video:** dê play no episódio, ou só abra a página de detalhe do anime
   (`/detail/...`) sem tocar nada, e clique no ícone da extensão.
-- **Temporada nova:** busque/escolha o anime no provider ativo (ou cole a URL/ID) e depois:
-  - ajuste o nº do episódio e clique em **Gravar** (ou **Finalizar** pra fechar a
-    temporada), ou
-  - clique em **Para assistir** pra guardar sem gravar progresso.
-- **Temporada já mapeada:** o popup mostra o alvo e seu progresso atual; ajuste o nº se
-  quiser e clique em **Gravar**.
-- **Ver mapeamentos:** lista tudo que já foi mapeado, com um botão que abre a página do
-  anime na plataforma de origem (**CR ↗** / **PV ↗**, colorido por plataforma), além das
-  opções de abrir no provider (**MAL ↗** / **AniList ↗**), **re-mapear** ou **apagar**.
-- **Trocar de provider:** o botão **⚙** no cabeçalho (ou a tela de configuração mostrada
-  antes de você logar) abre o seletor de provider a qualquer momento.
+- **Anime novo:** busque/escolha no AniList (ou cole a URL/ID); o destino (Para assistir vs.
+  Assistindo + progresso) depende se você veio da página do anime ou de um episódio.
+- **Já está numa lista:** o popup mostra a tela certa automaticamente — gravação rápida pra
+  um episódio reconhecido, ou a tela de detalhes completa a partir da página do próprio
+  anime.
+- **Nenhuma página relevante aberta:** o painel de lista — abas Assistindo / Para assistir,
+  com um botão manual **⟳ re-sync** ao lado das configurações caso queira puxar mudanças
+  feitas fora da extensão na hora.
 
 ### Detalhes de comportamento
 
-- **Não retrocede sozinho:** se o provider já marca um número maior que o episódio que você
+- **Não retrocede sozinho:** se o AniList já marca um número maior que o episódio que você
   vai gravar, a extensão avisa e pede um segundo clique antes de reduzir.
-- **Ajuste de episódio:** a numeração do Crunchyroll nem sempre bate com a do provider
-  (ex.: cour com numeração absoluta) — por isso o número é editável antes de gravar.
-- **`status`:** vira "concluído" quando o episódio atinge o total de episódios conhecido no
-  provider; senão fica "assistindo".
-- **Data de início automática:** ao gravar, se o progresso no provider estiver em **0** (e
-  o start date vazio), define o início como **hoje**. A trava é o progresso zerado, não o
-  número do episódio — assim funciona mesmo quando o Crunchyroll usa numeração sequencial
-  diferente da do provider (ex.: `E25` no CR = `S2E1` lá).
-- **Data de fim automática:** ao completar a temporada (nº ≥ total do provider, com finish
-  date vazio), define o fim como **hoje**.
-- **Botão "Finalizar":** marca concluído + fim = **hoje** explicitamente, útil quando o
-  provider não conhece o total (simulcast/temporada em andamento). Ajusta o progresso para
-  o total quando conhecido.
-- **Nunca sobrescreve datas:** início e fim só são preenchidos quando estão vazios; uma
-  data já existente no provider é preservada.
-- **"Para assistir" nunca sobrescreve progresso:** só define status "para assistir" no
-  provider se o anime ainda não estiver em nenhuma lista. Se já estiver assistindo,
-  concluído etc., clicar nele só grava o mapeamento local — seu status/progresso no
-  provider fica intocado.
-- **Sem progresso local:** a extensão não guarda cópia local de "episódios assistidos" —
-  esse número sempre vive no provider e é lido ao vivo de lá quando você abre o popup pra
-  um anime já mapeado. O que fica salvo localmente (`chrome.storage`) é o vínculo
-  Crunchyroll/Prime Video ↔ provider, por provider.
-- **Resolução entre providers:** se uma temporada já está mapeada num provider e você troca
-  pro outro, a extensão tenta o campo `idMal` do AniList pra resolver o vínculo sozinha
-  antes de cair na busca manual — funciona nos dois sentidos (MAL↔AniList).
+- **Ajuste de episódio:** a numeração do Crunchyroll nem sempre bate com a do AniList (ex.:
+  cour com numeração absoluta) — por isso o número é editável antes de gravar.
+- **Data de início automática:** ao gravar, se o progresso estiver em **0** (e o start date
+  vazio), define o início como **hoje**. A trava é o progresso zerado, não o número do
+  episódio — assim funciona mesmo quando o Crunchyroll usa numeração sequencial diferente da
+  do AniList (ex.: `E25` no CR = `S2E1` lá).
+- **Conclusão automática:** o anime completa sozinho — status vira `Completed`, data de fim
+  = **hoje** — quando o progresso bate o total de episódios conhecido. Não existe um botão
+  "Finalizar" separado pro caso raro de total desconhecido (ex.: simulcast em andamento) —
+  lacuna conhecida, não portada da arquitetura anterior.
+- **Nunca sobrescreve datas:** início e fim só são preenchidos quando estão vazios; uma data
+  já existente no AniList é preservada.
+- **Sair de "outras listas" (Completo/Dropado/Pausado/Reassistindo) pede confirmação:**
+  gravar progresso ou escolher Para assistir num anime que está atualmente numa dessas
+  mostra um aviso com a lista atual primeiro — clique de novo pra confirmar a mudança. Ir de
+  Para assistir pra Assistindo é progressão natural e nunca pede confirmação.
+- **Sem progresso local:** a extensão não guarda cópia própria de "episódios assistidos" —
+  o progresso sempre vive no AniList. O que fica em cache localmente
+  (`chrome.storage.local`) é uma cópia de leitura das suas listas, atualizada sozinha
+  (a cada ~1 semana, ou manualmente via **⟳**) e corrigida na hora sempre que a própria
+  extensão grava alguma coisa.
+
+## Limitações conhecidas
+
+- **O casamento com o Crunchyroll pode falhar pra anime com link desatualizado no
+  AniList.** O reconhecimento funciona principalmente casando o ID de série da URL da
+  página contra o link de Crunchyroll que o AniList tem cadastrado (`externalLinks`). Uma
+  conferência real contra a lista de um usuário achou **202 de 326** links de Crunchyroll
+  ainda no formato pré-2018 (`crunchyroll.com/<slug>`, sem ID de série) — esses nunca batem
+  por ID. Um fallback por título (comparação exata contra o romaji/inglês ou os sinônimos
+  do AniList) cobre a maioria desses casos, mas ainda pode falhar se o título da página do
+  Crunchyroll não bater exatamente com nenhum dos três (tradução/grafia diferente). Quando
+  isso acontece, o popup cai na tela de busca mesmo o anime já estando na sua lista — é só
+  buscar e escolher de novo, não cria duplicata.
 
 ## Estrutura
 
@@ -183,16 +158,13 @@ extension/
     pt_BR/messages.json  # strings da interface (idioma padrão)
     en/messages.json     # strings da interface (inglês)
   src/
-    background.js  # orquestra: detecta a source, lê o episódio da aba, roteia pro provider ativo, guarda o mapa
+    background.js  # orquestra: detecta a source, lê o episódio da aba, resolve qual dos 4 estados mostrar, fala com o AniList
     sources/
       crunchyroll.js  # extrai série/temporada/episódio do JSON-LD do Crunchyroll
       primevideo.js   # extrai série/temporada/episódio do overlay do player do Prime Video
     providers/
-      index.js    # registro dos providers (mal, anilist)
-      mal.js      # cliente da API do MAL (OAuth PKCE, busca, gravar progresso)
-      anilist.js  # cliente da API do AniList (OAuth Implicit Grant, busca/progresso via GraphQL)
-      shared.js   # helpers reaproveitados entre providers (parse de ID, cross-reference MAL↔AniList)
-    store.js       # wrapper de chrome.storage (config, tokens, mapa de mapeamentos — namespaced por provider)
+      anilist.js  # cliente da API do AniList (OAuth Implicit Grant, busca/lista/gravação via GraphQL)
+    store.js       # wrapper de chrome.storage (autenticação, cache local da lista, resolução CR/PV → AniList)
     popup.html/js  # a interface (máquina de estados), com strings via chrome.i18n
   icons/
 docs/            # notas de design internas (pt-BR), uma pasta por versão major
@@ -200,9 +172,9 @@ docs/            # notas de design internas (pt-BR), uma pasta por versão major
 
 ## Escopo atual
 
-Crunchyroll e Prime Video como sources (no Jellyfin, o plugin `jellyfin-ani-sync` já
-cobre); MAL e AniList como providers. Sem detecção automática de fim de episódio, sem
-score/rewatch, sem publicação na Chrome Web Store — uso pessoal, carregado unpacked.
+Crunchyroll e Prime Video como sources; AniList como único backend de tracking. Sem
+detecção automática de fim de episódio, sem score/rewatch, sem publicação na Chrome Web
+Store — uso pessoal, carregado unpacked.
 
 ## Licença
 

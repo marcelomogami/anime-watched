@@ -1,80 +1,200 @@
 {
   "extDescription": {
-    "message": "Grava rapidamente no MyAnimeList o episódio que você acabou de ver no Crunchyroll ou no Prime Video."
+    "message": "Grava rapidamente no AniList o episódio que você acabou de ver no Crunchyroll ou no Prime Video."
   },
-  "setupProviderLabel": { "message": "Provider (onde grava sua lista)" },
   "setupRedirectLabel": {
     "message": "Redirect URI (registre no app do {provider} em <a class=\"ext\" href=\"{url}\" target=\"_blank\">configurações do app</a>)"
   },
-  "setupClientIdLabel": { "message": "Client ID do {provider}" },
-  "setupClientIdPlaceholder": { "message": "cole aqui o Client ID" },
-  "setupClientSecretLabel": { "message": "Client Secret" },
-  "setupClientSecretHint": { "message": "(apps tipo \"web\" — deixe vazio se for \"other\")" },
-  "setupClientSecretPlaceholder": { "message": "cole o Client Secret (se houver)" },
-  "setupSaveCredsBtn": { "message": "Salvar credenciais" },
-  "setupLoginBtn": { "message": "Login no {provider}" },
-  "settingsBtnTitle": { "message": "Configurações / trocar provider" },
-  "linkShowMappings": { "message": "ver mapeamentos" },
-  "linkSetup": { "message": "configuração" },
-  "searchPlaceholder": { "message": "buscar no {provider}…" },
-  "searchBtn": { "message": "Buscar" },
-  "pasteUrlLabel": { "message": "Não achou? Cole a URL ou ID do anime no {provider}" },
-  "pasteUrlPlaceholder": { "message": "URL ou ID do anime (ex.: 12345)" },
-  "useBtn": { "message": "Usar" },
-  "epNumLabel": { "message": "Gravar episódio nº" },
-  "epMetaFormat": { "message": "S{season} · ep {episode}" },
-  "seasonOnlyFormat": { "message": "S{season} · página do anime" },
-  "noEpisodeFormat": { "message": "página do anime" },
-  "saveBtnLabel": { "message": "Gravar no {provider}" },
-  "completeBtnTitle": { "message": "Marca como concluído e define o fim como hoje" },
-  "completeBtnLabel": { "message": "Finalizar" },
-  "planToWatchBtnLabel": { "message": "Para assistir" },
-  "viewMappingsBtn": { "message": "ver mapeamentos" },
-  "changeAnimeBtn": { "message": "trocar anime" },
-  "mappingsTitle": { "message": "Mapeamentos salvos" },
-  "backBtn": { "message": "Voltar" },
-  "noMappingsYet": { "message": "Nenhum mapeamento ainda." },
-
-  "errNotSupportedSite": { "message": "Abra um episódio no Crunchyroll ou no Prime Video." },
-  "errNotAWatchPage": { "message": "Abra a página de um episódio ou da série no Crunchyroll." },
-  "errNoPlayerOpen": { "message": "Abra a página do anime ou dê play no episódio no Prime Video." },
-  "errCouldNotReadEpisode": { "message": "Não consegui ler o episódio nesta página." },
-  "episodeFallback": { "message": "Episódio" },
-  "errCouldNotIdentifySeries": { "message": "Não identifiquei a série/temporada do Crunchyroll. Recarregue a página." },
-  "searching": { "message": "Buscando…" },
-  "errSearchFailed": { "message": "busca falhou" },
-  "noSearchResults": { "message": "Nenhum resultado. Tente outro termo ou cole a URL do {provider}." },
-  "chooseBtn": { "message": "Escolher" },
-  "mappedTo": { "message": "✓ Mapeado para {title}." },
-  "readingProgress": { "message": "lendo progresso no {provider}…" },
-  "errCouldNotReadProgress": { "message": "não consegui ler o progresso atual" },
-  "malHasProgressWithTotal": { "message": "{provider} já tem: {watched} de {total} ep" },
-  "malHasProgressNoTotal": { "message": "{provider} já tem: {watched} ep" },
-  "notInListWithTotal": { "message": "ainda não está na sua lista · {total} ep" },
-  "notInListNoTotal": { "message": "ainda não está na sua lista" },
-  "startDateLabel": { "message": "início {date}" },
-  "finishDateLabel": { "message": "fim {date}" },
-  "regressWarning": { "message": "Atenção: o {provider} já marca {cur}. Gravar {num} vai reduzir seu progresso." },
-  "saveBtnForce": { "message": "Gravar mesmo assim" },
-  "finishingMsg": { "message": "Finalizando…" },
-  "savingMsg": { "message": "Gravando…" },
-  "errFailedToSave": { "message": "Falha ao gravar." },
-  "startedTodayTag": { "message": "início hoje" },
-  "finishedTodayTag": { "message": "fim hoje" },
-  "completedTag": { "message": "concluído" },
-  "savedMsg": { "message": "✓ {title} — episódio {num} gravado{suffix}." },
-  "errInvalidEpisodeNumber": { "message": "Número de episódio inválido." },
-  "errInvalidEpisodeNumberComplete": { "message": "Número de episódio inválido para finalizar." },
-  "confirmReduceMsg": { "message": "Clique novamente para confirmar a redução." },
-  "remapTitle": { "message": "Re-mapear" },
-  "errCouldNotGetStatus": { "message": "Erro ao obter status." },
-  "credsSaved": { "message": "Credenciais salvas." },
-  "openingLogin": { "message": "Abrindo login do {provider}…" },
-  "authenticated": { "message": "✓ Autenticado." },
-  "errLoginFailed": { "message": "Falha no login." },
-  "errInvalidMalUrl": { "message": "URL/ID do {provider} inválido." },
-  "searchingAnime": { "message": "Buscando anime…" },
-  "errAnimeNotFound": { "message": "Anime não encontrado." },
-  "remapBtn": { "message": "re-mapear" },
-  "deleteBtn": { "message": "apagar" }
+  "setupClientIdLabel": {
+    "message": "Client ID do {provider}"
+  },
+  "setupClientIdPlaceholder": {
+    "message": "cole aqui o Client ID"
+  },
+  "setupSaveCredsBtn": {
+    "message": "Salvar credenciais"
+  },
+  "setupLoginBtn": {
+    "message": "Login no {provider}"
+  },
+  "settingsBtnTitle": {
+    "message": "Configurações"
+  },
+  "searchBtn": {
+    "message": "Buscar"
+  },
+  "pasteUrlPlaceholder": {
+    "message": "URL ou ID do anime (ex.: 12345)"
+  },
+  "useBtn": {
+    "message": "Usar"
+  },
+  "epNumLabel": {
+    "message": "Gravar episódio nº"
+  },
+  "epMetaFormat": {
+    "message": "S{season} · ep {episode}"
+  },
+  "seasonOnlyFormat": {
+    "message": "S{season} · página do anime"
+  },
+  "planToWatchBtnLabel": {
+    "message": "Para assistir"
+  },
+  "backBtn": {
+    "message": "Voltar"
+  },
+  "episodeFallback": {
+    "message": "Episódio"
+  },
+  "searching": {
+    "message": "Buscando…"
+  },
+  "errSearchFailed": {
+    "message": "busca falhou"
+  },
+  "chooseBtn": {
+    "message": "Escolher"
+  },
+  "savingMsg": {
+    "message": "Gravando…"
+  },
+  "errFailedToSave": {
+    "message": "Falha ao gravar."
+  },
+  "errInvalidEpisodeNumber": {
+    "message": "Número de episódio inválido."
+  },
+  "errCouldNotGetStatus": {
+    "message": "Erro ao obter status."
+  },
+  "credsSaved": {
+    "message": "Credenciais salvas."
+  },
+  "openingLogin": {
+    "message": "Abrindo login do {provider}…"
+  },
+  "authenticated": {
+    "message": "✓ Autenticado."
+  },
+  "errLoginFailed": {
+    "message": "Falha no login."
+  },
+  "searchingAnime": {
+    "message": "Buscando anime…"
+  },
+  "errAnimeNotFound": {
+    "message": "Anime não encontrado."
+  },
+  "panelTabWatching": {
+    "message": "Assistindo"
+  },
+  "panelTabPlanning": {
+    "message": "Para assistir"
+  },
+  "panelLoading": {
+    "message": "Carregando…"
+  },
+  "panelEmptyWatching": {
+    "message": "Nada em Assistindo ainda."
+  },
+  "panelEmptyPlanning": {
+    "message": "Nada em Para assistir ainda."
+  },
+  "panelErrLoading": {
+    "message": "Erro ao carregar a lista."
+  },
+  "panelProgress": {
+    "message": "{progress}/{total} ep"
+  },
+  "panelProgressNoTotal": {
+    "message": "{progress} ep"
+  },
+  "panelNextEpisodeIn": {
+    "message": "próximo episódio em {time}"
+  },
+  "detailSaveBtn": {
+    "message": "Gravar"
+  },
+  "pauseBtn": {
+    "message": "Pausar"
+  },
+  "dropBtn": {
+    "message": "Dropar"
+  },
+  "statusCompleted": {
+    "message": "Completo"
+  },
+  "statusDropped": {
+    "message": "Dropado"
+  },
+  "statusPaused": {
+    "message": "Pausado"
+  },
+  "statusRepeating": {
+    "message": "Reassistindo"
+  },
+  "detailInStatus": {
+    "message": "Está em: {status}"
+  },
+  "detailConfirmMove": {
+    "message": "Está em {status} — clique de novo pra confirmar."
+  },
+  "detailConfirmDrop": {
+    "message": "Clique de novo pra confirmar que quer dropar."
+  },
+  "detailConfirmPause": {
+    "message": "Clique de novo pra confirmar que quer pausar."
+  },
+  "detailSavedMsg": {
+    "message": "Salvo."
+  },
+  "detailErrSave": {
+    "message": "Erro ao salvar."
+  },
+  "epOfTotal": {
+    "message": "/ {total}"
+  },
+  "viewDetailsBtn": {
+    "message": "Detalhes"
+  },
+  "searchPlaceholderAnilist": {
+    "message": "buscar no AniList…"
+  },
+  "pasteUrlLabelAnilist": {
+    "message": "Não achou? Cole a URL ou ID do anime no AniList"
+  },
+  "noSearchResultsAnilist": {
+    "message": "Nenhum resultado no AniList."
+  },
+  "errInvalidAnilistUrl": {
+    "message": "URL/ID do AniList inválido."
+  },
+  "resyncBtnTitle": {
+    "message": "Atualizar lista (re-sync completo)"
+  },
+  "panelSyncedAgo": {
+    "message": "Sincronizado há {time}"
+  },
+  "panelSyncingMsg": {
+    "message": "Sincronizando…"
+  },
+  "panelResyncedMsg": {
+    "message": "Lista atualizada."
+  },
+  "panelResyncErr": {
+    "message": "Erro ao atualizar a lista."
+  },
+  "timeJustNow": {
+    "message": "agora mesmo"
+  },
+  "timeMinAgo": {
+    "message": "{n}min"
+  },
+  "timeHoursAgo": {
+    "message": "{n}h"
+  },
+  "timeDaysAgo": {
+    "message": "{n}d"
+  }
 }

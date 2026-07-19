@@ -1,4 +1,8 @@
-// providers/anilist.js — provider AniList (OAuth2 Implicit Grant + GraphQL).
+// providers/anilist.js — AniList (OAuth2 Implicit Grant + GraphQL). Único
+// backend de tracking desde o v1.0.0 (MAL saiu completamente, ver
+// docs/1.0.0/contexto.md) — o nome do arquivo/módulo ficou "providers/" por
+// história, não porque ainda existe escolha de provider.
+//
 // AniList não suporta refresh token em nenhum dos dois grants (implicit ou
 // authorization code) — o token dura ~1 ano e depois exige relogin. Como não
 // há ganho real de segurança em manter um client_secret que nunca é usado
@@ -7,10 +11,9 @@
 // limitação de durabilidade do Authorization Code Grant.
 // Fluxo confirmado em https://docs.anilist.co/guide/auth/implicit e
 // schema confirmado por introspecção direta em https://graphql.anilist.co
-// (ver docs/contexto-providers.md).
+// (ver docs/0.5.3/contexto-providers.md e docs/1.0.0/design.md).
 
 import { store } from '../store.js';
-import { parseAnimeId } from './shared.js';
 
 const PROVIDER_ID = 'anilist';
 
@@ -138,6 +141,8 @@ async function gqlFetch(query, variables) {
   return body;
 }
 
+// --- busca (estado 1) ---
+
 const MEDIA_FIELDS = `
   id
   idMal
@@ -181,50 +186,25 @@ export async function getAnime(animeId) {
   return nodeToCandidate(res.data.Media);
 }
 
-// Tenta achar o equivalente no AniList a partir do id de outro provider, pra
-// evitar remapear na mão quando os dois catálogos já concordam no vínculo
-// (ver docs/contexto-providers.md, "Bônus possível"). Hoje só sabe cruzar com
-// o MAL, via `idMal` — não existe um `idAnilist` do lado do MAL pro caminho
-// inverso. Retorna null (sem lançar) quando não encontra, já que "não achou
-// cross-ref" é um resultado esperado, não uma falha.
-export async function findByCrossRef(otherProviderId, otherAnimeId) {
-  if (otherProviderId !== 'mal') return null;
-  const gql = `query ($idMal: Int) { Media(idMal: $idMal, type: ANIME) { ${MEDIA_FIELDS} } }`;
-  try {
-    const res = await gqlFetch(gql, { idMal: Number(otherAnimeId) });
-    return res.data.Media ? nodeToCandidate(res.data.Media) : null;
-  } catch {
-    return null;
-  }
-}
+// --- lista completa (cache) — ver docs/1.0.0/design.md ---
 
-export function parseId(input) {
-  return parseAnimeId(input);
-}
-
-export function getDisplayUrl(animeId) {
-  return `https://anilist.co/anime/${animeId}`;
-}
-
-// MediaListStatus (AniList, maiúsculo) <-> vocabulário genérico já usado
-// pelo resto da extensão (minúsculo, herdado do MAL) — ver
-// docs/contexto-providers.md sobre por que os providers normalizam pro
-// mesmo shape.
-const STATUS_TO_GENERIC = {
-  CURRENT: 'watching',
-  COMPLETED: 'completed',
-  PLANNING: 'plan_to_watch',
-  DROPPED: 'dropped',
-  PAUSED: 'on_hold',
-  REPEATING: 'watching',
-};
-
-function fuzzyDateToStr(d) {
-  if (!d || !d.year) return '';
-  const mm = String(d.month || 1).padStart(2, '0');
-  const dd = String(d.day || 1).padStart(2, '0');
-  return `${d.year}-${mm}-${dd}`;
-}
+// Campos do `Media` usados pra montar cada entrada do cache local — mesmo
+// shape em `getListCache()` e `saveEntry()` (a mutation devolve `media`
+// nesse formato também, confirmado por introspecção: `SaveMediaListEntry`
+// retorna `MediaList`, e `MediaList.media` resolve pro `Media` de verdade —
+// dá pra montar/atualizar o cache com a resposta da própria mutation, sem
+// uma segunda busca).
+const LIST_ENTRY_MEDIA_FIELDS = `
+  id
+  title { romaji english }
+  synonyms
+  bannerImage
+  coverImage { medium large }
+  episodes
+  siteUrl
+  externalLinks { site url type }
+  nextAiringEpisode { episode airingAt timeUntilAiring }
+`;
 
 function strToFuzzyDate(s) {
   if (!s) return undefined;
@@ -232,78 +212,96 @@ function strToFuzzyDate(s) {
   return { year, month, day };
 }
 
-export async function getListStatus(animeId) {
+// Campos da entrada em si (não do anime) — `startedAt`/`completedAt` aqui
+// pra dar pro popup decidir se já tem data (não sobrescrever, mesma regra
+// da v0.1.1 — ver `computeAutoDates` em popup.js) sem precisar de uma
+// segunda busca.
+const LIST_ENTRY_FIELDS = `
+  id
+  status
+  progress
+  updatedAt
+  startedAt { year month day }
+  completedAt { year month day }
+  media { ${LIST_ENTRY_MEDIA_FIELDS} }
+`;
+
+async function getViewerId() {
+  const cached = await store.getViewerId(PROVIDER_ID);
+  if (cached) return cached;
+  const res = await gqlFetch('query { Viewer { id } }');
+  const viewerId = res.data.Viewer?.id;
+  if (!viewerId) {
+    throw new Error('Não foi possível identificar o usuário autenticado no AniList.');
+  }
+  await store.setViewerId(PROVIDER_ID, viewerId);
+  return viewerId;
+}
+
+// Busca a MediaListCollection inteira do usuário logado — todos os 6
+// status (não só Watching/Planning, necessário pra detectar
+// COMPLETED/DROPPED/PAUSED/REPEATING nos estados 3 e 4 do popup, ver
+// docs/1.0.0/visao.md). A API pagina de verdade (`chunk`/`perChunk`, máximo
+// 500 por chunk; o retorno tem `hasNextChunk`) — confirmado ao vivo, de
+// dentro da extensão de verdade (Fase 2, via `chrome.storage`/token real):
+// a lista real do usuário tem 506 entradas, bate o limite de uma chunk e
+// precisa da segunda; o loop terminou certo (`hasNextChunk` virou `false`
+// na 2ª chunk).
+export async function getListCache() {
   const gql = `
-    query ($id: Int) {
-      Media(id: $id, type: ANIME) {
-        episodes
-        mediaListEntry {
-          progress
-          status
-          startedAt { year month day }
-          completedAt { year month day }
+    query ($userId: Int, $chunk: Int) {
+      MediaListCollection(userId: $userId, type: ANIME, chunk: $chunk, perChunk: 500) {
+        hasNextChunk
+        lists {
+          entries { ${LIST_ENTRY_FIELDS} }
         }
       }
     }
   `;
-  const res = await gqlFetch(gql, { id: Number(animeId) });
-  const media = res.data.Media;
-  const entry = media?.mediaListEntry || null;
-  return {
-    numWatched: entry?.progress ?? 0,
-    status: entry ? STATUS_TO_GENERIC[entry.status] || null : null,
-    inList: !!entry,
-    numEpisodes: media?.episodes || 0,
-    startDate: fuzzyDateToStr(entry?.startedAt),
-    finishDate: fuzzyDateToStr(entry?.completedAt),
-  };
+  const userId = await getViewerId();
+  const entries = [];
+  let chunk = 1;
+  let hasNext = true;
+  while (hasNext) {
+    const res = await gqlFetch(gql, { userId, chunk });
+    const collection = res.data.MediaListCollection;
+    for (const list of collection.lists) entries.push(...list.entries);
+    hasNext = !!collection.hasNextChunk;
+    chunk += 1;
+  }
+  return entries;
 }
 
-export async function updateEpisodes(
-  animeId,
-  numEpisodes,
-  totalEpisodes = 0,
-  dates = {},
-  completed = false,
-) {
-  const status =
-    completed || (totalEpisodes > 0 && numEpisodes >= totalEpisodes)
-      ? 'COMPLETED'
-      : 'CURRENT';
+// Grava/atualiza uma entrada da lista — cobre adicionar (busca, estado 1),
+// gravar progresso (estado 4), Plan to watch/Dropar/Pausar/trocar status
+// (tela de detalhes, estado 3). Um wrapper só pra tudo. Sempre usa
+// `mediaId` (não `id` da entrada) — `SaveMediaListEntry` faz upsert por
+// `mediaId` (confirmado contra o comportamento real do MALSync em sessão
+// anterior deste projeto — ver AGENTS.md — salvar sem `id` atualiza a
+// entrada existente em vez de duplicar), então não precisa saber se o anime
+// já tem entrada ou não antes de chamar. Pede `media { ... }` na resposta
+// pra dar pra atualizar o cache local direto, sem segunda busca (ver
+// `store.patchListCacheEntry`). `startDate`/`finishDate` são strings
+// "YYYY-MM-DD" (ou undefined) — mesma regra da v0.1.1 pra quando
+// preenchê-las mora em popup.js (`computeAutoDates`), aqui só converte pro
+// `FuzzyDateInput` do AniList.
+export async function saveEntry({ mediaId, status, progress, startDate, finishDate }) {
   const gql = `
-    mutation ($mediaId: Int, $progress: Int, $status: MediaListStatus, $startedAt: FuzzyDateInput, $completedAt: FuzzyDateInput) {
-      SaveMediaListEntry(mediaId: $mediaId, progress: $progress, status: $status, startedAt: $startedAt, completedAt: $completedAt) {
-        id
-        status
-        progress
+    mutation ($mediaId: Int, $status: MediaListStatus, $progress: Int, $startedAt: FuzzyDateInput, $completedAt: FuzzyDateInput) {
+      SaveMediaListEntry(mediaId: $mediaId, status: $status, progress: $progress, startedAt: $startedAt, completedAt: $completedAt) {
+        ${LIST_ENTRY_FIELDS}
       }
     }
   `;
-  return (
-    await gqlFetch(gql, {
-      mediaId: Number(animeId),
-      progress: numEpisodes,
-      status,
-      startedAt: strToFuzzyDate(dates.start_date),
-      completedAt: strToFuzzyDate(dates.finish_date),
-    })
-  ).data.SaveMediaListEntry;
-}
-
-// Marca como "PLANNING" (plan to watch), sem progresso e sem datas.
-export async function setPlanToWatch(animeId) {
-  const gql = `
-    mutation ($mediaId: Int) {
-      SaveMediaListEntry(mediaId: $mediaId, status: PLANNING, progress: 0) {
-        id
-        status
-      }
-    }
-  `;
-  return (await gqlFetch(gql, { mediaId: Number(animeId) })).data.SaveMediaListEntry;
+  const res = await gqlFetch(gql, {
+    mediaId: Number(mediaId),
+    status,
+    progress,
+    startedAt: strToFuzzyDate(startDate),
+    completedAt: strToFuzzyDate(finishDate),
+  });
+  return res.data.SaveMediaListEntry;
 }
 
 export const id = PROVIDER_ID;
 export const label = 'AniList';
-// Implicit Grant não usa client_secret — a UI de setup esconde o campo.
-export const authFields = { clientSecret: false };
