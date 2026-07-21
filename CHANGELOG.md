@@ -5,6 +5,18 @@ All notable changes to this project are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 and the project adopts [Semantic Versioning](https://semver.org/).
 
+## [1.0.5] — 2026-07-21
+
+### Fixed
+
+- **Next-episode countdown could show a stale, frozen number.** It was computed from
+  `nextAiringEpisode.timeUntilAiring`, a value relative to the moment AniList answered the
+  query — but the panel list is cached locally for up to 7 days between resyncs, so the
+  displayed countdown didn't tick down in real time and could be hours or days off (even
+  showing a countdown for an episode that had already aired). Now computed from
+  `nextAiringEpisode.airingAt` (an absolute timestamp) against the current time on every
+  render, so it's always accurate regardless of cache age.
+
 ## [1.0.4] — 2026-07-19
 
 ### Fixed

@@ -143,7 +143,14 @@ function episodeAvailability(entry, media) {
   const nextEp = media.nextAiringEpisode;
   if (nextEp) {
     if (entry.progress + 1 < nextEp.episode) return { available: true };
-    return { available: false, countdown: formatCountdown(nextEp.timeUntilAiring) };
+    // `timeUntilAiring` é relativo ao instante da query e fica congelado no
+    // cache local (até 7 dias sem resync, ver background.js SEVEN_DAYS_MS) —
+    // usar ele direto mostra uma contagem parada/errada quando o popup é
+    // aberto bem depois do último sync. `airingAt` é timestamp absoluto, dá
+    // pra recalcular o tempo real restante a qualquer momento.
+    const secondsLeft = nextEp.airingAt - Math.floor(Date.now() / 1000);
+    if (secondsLeft <= 0) return { available: true };
+    return { available: false, countdown: formatCountdown(secondsLeft) };
   }
   // `nextAiringEpisode` nulo não é garantia de que a série acabou de exibir —
   // achado real (usuário, 2026-07-19): o AniList devolveu esse campo nulo
