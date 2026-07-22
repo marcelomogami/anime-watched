@@ -17,6 +17,32 @@ function localRemove(key) {
   return new Promise((resolve) => chrome.storage.local.remove(key, resolve));
 }
 
+// Numerais romanos usados pelo AniList pra marcar temporada >= 2 no título
+// romaji (ex.: "Mushoku Tensei II: ..." pra S2). Índice 0 = temporada 2.
+const SEASON_ROMAN = ['II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X'];
+
+// Confere se um título (romaji OU english) "pertence" à temporada informada.
+// Usado só pra desambiguar candidatos empatados por ID (ver
+// `resolveEntryForSource` abaixo) — a CR costuma usar UMA página de série só
+// pra franquias multi-temporada (ex.: Mushoku Tensei: S1/S2/S3 têm o mesmo
+// crSeriesId), então casar só por ID não basta. Temporada 1 não tem marcador
+// próprio no título (nem numeral romano nem "Season 1") — só é reconhecida
+// pela AUSÊNCIA de marcador de qualquer temporada >= 2. Limitação conhecida:
+// splits "Part 2" dentro da mesma temporada grande (ex.: "Mushoku Tensei II:
+// ... Part 2") continuam ambíguos entre si, já que carregam o mesmo numeral.
+function titleMatchesSeason(title, seasonNumber) {
+  if (!title) return false;
+  if (new RegExp(`\\bseason\\s*${seasonNumber}\\b`, 'i').test(title)) return true;
+  if (seasonNumber >= 2) {
+    const roman = SEASON_ROMAN[seasonNumber - 2];
+    return roman ? new RegExp(`\\b${roman}\\b`).test(title) : false;
+  }
+  const hasHigherSeasonMarker =
+    /\bseason\s*\d+\b/i.test(title) ||
+    SEASON_ROMAN.some((r) => new RegExp(`\\b${r}\\b`).test(title));
+  return !hasHigherSeasonMarker;
+}
+
 // Fallback por título (romaji/english/synonyms, comparação exata sem fuzzy)
 // usado quando o casamento por ID falha — tanto por link desatualizado no
 // AniList (CR) quanto por falta de índice ainda (PV), ver
@@ -132,22 +158,34 @@ export const store = {
   //     achado real (2026-07-18) mostrou 202 de 326 entradas com link de CR
   //     ainda no formato antigo (`crunchyroll.com/<slug>`, sem `/series/<id>/`,
   //     era pré-2018), que nunca bate por ID — cai no mesmo fallback por
-  //     título do PV abaixo.
+  //     título do PV abaixo. Franquias multi-temporada costumam ter VÁRIAS
+  //     entradas do AniList batendo no mesmo `crSeriesId` (confirmado com
+  //     dado real 2026-07-22: Mushoku Tensei S2/S3/S2-Part2 compartilham a
+  //     mesma página de série na CR) — quando isso acontece, desambigua por
+  //     `seasonNumber` via `titleMatchesSeason` antes de aceitar o primeiro.
   //   - Prime Video: `sourceId` (pvDetailId) não bate com o ASIN do
   //     `externalLinks` (ver `getPvMediaId` acima) — tenta o índice primeiro;
   //     sem índice ainda, cai pro fallback por título (best-effort, sem
   //     garantia — compara romaji/english/synonyms exato, sem fuzzy).
-  async resolveEntryForSource({ site, sourceId, seriesTitle }) {
+  async resolveEntryForSource({ site, sourceId, seriesTitle, seasonNumber }) {
     const cache = await store.getListCache();
     if (!cache) return null;
 
     if (site === 'cr') {
-      const byId = cache.entries.find((entry) =>
+      const candidates = cache.entries.filter((entry) =>
         (entry.media?.externalLinks || []).some(
           (link) => link.type === 'STREAMING' && link.url.includes(sourceId),
         ),
       );
-      return byId || findByTitle(cache, seriesTitle);
+      if (candidates.length > 1 && seasonNumber) {
+        const bySeason = candidates.find(
+          (entry) =>
+            titleMatchesSeason(entry.media?.title?.romaji, seasonNumber) ||
+            titleMatchesSeason(entry.media?.title?.english, seasonNumber),
+        );
+        if (bySeason) return bySeason;
+      }
+      return candidates[0] || findByTitle(cache, seriesTitle);
     }
 
     if (site === 'pv') {

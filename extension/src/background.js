@@ -63,6 +63,7 @@ async function resolveState() {
     site: data.site,
     sourceId,
     seriesTitle: data.seriesTitle,
+    seasonNumber: data.seasonNumber,
   });
 
   if (entry) {

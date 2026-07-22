@@ -5,6 +5,20 @@ All notable changes to this project are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 and the project adopts [Semantic Versioning](https://semver.org/).
 
+## [1.0.6] — 2026-07-22
+
+### Fixed
+
+- **Wrong season could be recognized on a Crunchyroll episode page for multi-season
+  franchises.** Crunchyroll hosts every season of a series under a single series page/ID for
+  some franchises (confirmed live with Mushoku Tensei: S2, S2 Part 2, and S3 all share the same
+  `crSeriesId`, since they're separate AniList entries but the same CR series URL). The lookup
+  matched by `crSeriesId` alone, so watching S3E4 could resolve to the S2 entry from the AniList
+  list instead — whichever entry happened to come first. Now, when more than one list entry
+  shares the same `crSeriesId`, the extension disambiguates using the season number already
+  extracted from the page (via Roman numeral or "Season N" in the AniList title) before falling
+  back to the first match.
+
 ## [1.0.5] — 2026-07-21
 
 ### Fixed
