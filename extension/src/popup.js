@@ -211,13 +211,14 @@ function renderPanelCard(entry) {
   const title = media.title?.romaji || media.title?.english || '?';
   const bannerSrc = media.bannerImage || media.coverImage?.large || media.coverImage?.medium || '';
   const availability = episodeAvailability(entry, media);
+  const isAvailable = !!availability?.available;
   const availabilityHtml = !availability
     ? ''
-    : availability.available
+    : isAvailable
       ? `<div class="countdown available">${escapeHtml(tr('panelNewEpisodeAvailable'))}</div>`
       : `<div class="countdown">${escapeHtml(tr('panelNextEpisodeIn', { time: availability.countdown }))}</div>`;
   const row = document.createElement('div');
-  row.className = 'mapcard';
+  row.className = isAvailable ? 'mapcard available' : 'mapcard';
   row.innerHTML = `
     ${bannerSrc ? `<img class="banner" src="${escapeHtml(bannerSrc)}" alt="">` : '<div class="banner"></div>'}
     <div class="info">

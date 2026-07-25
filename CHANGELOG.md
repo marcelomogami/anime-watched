@@ -5,6 +5,12 @@ All notable changes to this project are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 and the project adopts [Semantic Versioning](https://semver.org/).
 
+## [1.0.8] — 2026-07-25
+
+### Added
+
+- **Highlighted background for cards with new episodes available.** In the popup list panel, cards for anime that have new episodes ready to watch (`new episode available to watch`) now render with a subtle greenish background (`#1b2e23`) and border, making unwatched released episodes instantly recognizable at a glance.
+
 ## [1.0.7] — 2026-07-25
 
 ### Added
@@ -464,6 +470,7 @@ Crunchyroll to MyAnimeList via the toolbar button.
 - No automatic end-of-episode detection, no score/rewatch, no Chrome Web Store publishing
   (personal use, loaded unpacked).
 
+[1.0.8]: https://github.com/marcelomogami/anime-watched/releases/tag/v1.0.8
 [1.0.7]: https://github.com/marcelomogami/anime-watched/releases/tag/v1.0.7
 [1.0.6]: https://github.com/marcelomogami/anime-watched/releases/tag/v1.0.6
 [1.0.4]: https://github.com/marcelomogami/anime-watched/releases/tag/v1.0.4
