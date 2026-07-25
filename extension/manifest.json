@@ -1,13 +1,15 @@
 {
   "manifest_version": 3,
   "name": "Anime Watched",
-  "version": "1.0.6",
+  "version": "1.0.7",
   "default_locale": "en",
   "description": "__MSG_extDescription__",
   "permissions": ["storage", "identity", "scripting", "activeTab"],
   "host_permissions": [
     "*://*.crunchyroll.com/*",
     "*://*.primevideo.com/*",
+    "*://*.amazon.com/dp/*",
+    "*://*.amazon.com/gp/video/detail/*",
     "https://graphql.anilist.co/*"
   ],
   "background": {
@@ -35,7 +37,11 @@
       "run_at": "document_idle"
     },
     {
-      "matches": ["*://*.primevideo.com/*"],
+      "matches": [
+        "*://*.primevideo.com/*",
+        "*://*.amazon.com/dp/*",
+        "*://*.amazon.com/gp/video/detail/*"
+      ],
       "js": ["src/sources/primevideo.js"],
       "run_at": "document_idle"
     }

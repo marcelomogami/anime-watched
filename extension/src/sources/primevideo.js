@@ -6,17 +6,21 @@
 
 (function () {
   function parseDetailId(url) {
-    const m = (url || '').match(/\/detail\/([A-Z0-9]+)/i);
+    const m = (url || '').match(/\/(?:detail|dp|video\/detail)\/([A-Z0-9]+)/i);
     return m ? m[1] : null;
   }
 
   // Lê temporada/episódio/títulos do overlay do player, se estiver aberto.
   function fromPlayerOverlay() {
-    const episodeEl = document.querySelector('.atvwebplayersdk-episode-info');
+    const episodeEl = document.querySelector(
+      '.atvwebplayersdk-episode-info, .atvwebplayersdk-subtitle-text',
+    );
     if (!episodeEl) return null; // player fechado / nada tocando
 
     const text = (episodeEl.textContent || '').trim();
-    const m = text.match(/^T(\d+)\s*Ep\.(\d+)\s*(.*)$/i);
+    const m = text.match(
+      /^(?:T|S|Season|Temporada)\s*(\d+)[\s,]*[–-]?[\s,]*(?:Ep\.|Ep|E|Episode|Episódio)\s*\.?\s*(\d+)[\s:\-–—,]*(.*)$/i,
+    );
     if (!m) return null;
 
     const titleEl = document.querySelector('.atvwebplayersdk-title-text');
@@ -56,7 +60,11 @@
     const seasonNumber = m ? Number(m[1]) : null;
     const seriesTitle = m
       ? m[2].trim()
-      : document.title.replace(/^Prime Video:\s*/i, '').trim();
+      : document.title
+          .replace(/^(?:Prime Video:\s*|Watch\s*)/i, '')
+          .replace(/\s*\|\s*Prime Video\s*$/i, '')
+          .replace(/\s*–\s*Prime Video\s*$/i, '')
+          .trim();
     if (!seriesTitle) return null; // página ainda não renderizou
 
     return {

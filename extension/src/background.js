@@ -9,7 +9,7 @@ import * as anilist from './providers/anilist.js';
 // Sources suportadas: cada uma tem seu content script de extração.
 const SITES = [
   { test: /crunchyroll\.com/, file: 'src/sources/crunchyroll.js' },
-  { test: /primevideo\.com/, file: 'src/sources/primevideo.js' },
+  { test: /(?:primevideo\.com|amazon\.com\/(?:dp|gp\/video\/detail)\/)/, file: 'src/sources/primevideo.js' },
 ];
 
 // Lê o episódio atual da aba ativa, injetando o content script certo se preciso.
@@ -116,7 +116,10 @@ async function getPanelEntries() {
 // e 4) e já atualiza o cache local com a própria resposta da mutation, sem
 // segunda busca (docs/1.0.0/design.md § "Adicionar/atualizar entrada no
 // cache local, numa chamada só").
-async function saveEntry({ mediaId, status, progress, startDate, finishDate }) {
+async function saveEntry({ mediaId, status, progress, startDate, finishDate, pvDetailId }) {
+  if (pvDetailId) {
+    await store.setPvMediaId(pvDetailId, mediaId);
+  }
   const result = await anilist.saveEntry({ mediaId, status, progress, startDate, finishDate });
   await store.patchListCacheEntry(result);
   return { ok: true, entry: result };
@@ -173,6 +176,7 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
               progress: msg.progress,
               startDate: msg.startDate,
               finishDate: msg.finishDate,
+              pvDetailId: msg.pvDetailId,
             }),
           );
           break;

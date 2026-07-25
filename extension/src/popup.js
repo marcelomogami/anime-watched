@@ -337,7 +337,8 @@ function showDetail(entry, opts = {}) {
   if (bannerSrc) img.src = bannerSrc;
   else img.removeAttribute('src');
   $('detailTitle').textContent = title;
-  $('detailProgress').value = String(entry.progress ?? 0);
+  const defaultEp = opts.source?.episodeNumber != null ? opts.source.episodeNumber : (entry.progress ?? 0);
+  $('detailProgress').value = String(defaultEp);
   $('detailTotal').textContent = tr('epOfTotal', { total: media.episodes || '??' });
 
   const statusLabel = STATUS_LABEL_KEY[entry.status];
@@ -524,6 +525,7 @@ async function onQuickSave() {
     progress,
     startDate: dates.startDate,
     finishDate: dates.finishDate,
+    pvDetailId: quickSource?.pvDetailId,
   });
   if (!resp.ok) {
     setMsg(resp.error || tr('detailErrSave'), 'err');

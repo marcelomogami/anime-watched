@@ -194,6 +194,13 @@ export const store = {
         const byId = cache.entries.find((entry) => entry.media?.id === mediaId);
         if (byId) return byId;
       }
+      const candidateByExternal = cache.entries.find((entry) =>
+        (entry.media?.externalLinks || []).some(
+          (link) => link.type === 'STREAMING' && link.url.includes(sourceId),
+        ),
+      );
+      if (candidateByExternal) return candidateByExternal;
+
       return findByTitle(cache, seriesTitle);
     }
 

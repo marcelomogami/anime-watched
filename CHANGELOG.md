@@ -5,6 +5,20 @@ All notable changes to this project are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 and the project adopts [Semantic Versioning](https://semver.org/).
 
+## [1.0.7] — 2026-07-25
+
+### Added
+
+- **Support for Amazon Video URLs (`amazon.com/dp/...` / `amazon.com/gp/video/detail/...`).** AniList's external streaming links for Prime Video titles often point to `amazon.com` US URLs instead of `primevideo.com`. The extension's Prime Video source wrapper (`sources/primevideo.js`) now runs on both `primevideo.com` and `amazon.com` video URLs, extracting series titles and episode details seamlessly across both domains.
+
+### Fixed
+
+- **Episode extraction and progress recording on Amazon US / English interface.**
+  - Player overlay extraction (`sources/primevideo.js`) now queries `.atvwebplayersdk-subtitle-text` alongside `.atvwebplayersdk-episode-info`, and uses an expanded regex to parse comma-separated English episode strings (e.g. `Season 2, Ep. 3 Title`).
+  - Added `externalLinks` ASIN matching for Prime Video in `store.js` so entries resolve immediately against AniList cache when visiting `amazon.com/dp/<ASIN>`.
+  - Added automatic persistence of `pvDetailId` mapping in `store.setPvMediaId` upon saving progress, remembering the mapping for future visits.
+  - Pre-filled `detailProgress` in popup detail screen with the detected episode number when opening details from an episode page.
+
 ## [1.0.6] — 2026-07-22
 
 ### Fixed
@@ -450,6 +464,8 @@ Crunchyroll to MyAnimeList via the toolbar button.
 - No automatic end-of-episode detection, no score/rewatch, no Chrome Web Store publishing
   (personal use, loaded unpacked).
 
+[1.0.7]: https://github.com/marcelomogami/anime-watched/releases/tag/v1.0.7
+[1.0.6]: https://github.com/marcelomogami/anime-watched/releases/tag/v1.0.6
 [1.0.4]: https://github.com/marcelomogami/anime-watched/releases/tag/v1.0.4
 [1.0.3]: https://github.com/marcelomogami/anime-watched/releases/tag/v1.0.3
 [1.0.2]: https://github.com/marcelomogami/anime-watched/releases/tag/v1.0.2
